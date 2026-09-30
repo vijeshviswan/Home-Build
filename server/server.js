@@ -517,22 +517,32 @@ app.delete('/api/cash-sources/:id', async (req, res) => {
   }
 });
 
+// Unmatched API requests return 404 JSON instead of falling through to HTML
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
+// ==========================================
+// SERVE STATIC FRONTEND (PRODUCTION)
+// ==========================================
+
 // Determine absolute path to the client build directory
 const possibleDistPaths = [
-  path.join(__dirname, '../client/dist'),
-  path.join(__dirname, 'client/dist'),
-  path.join(__dirname, 'dist'),
-  path.join(process.cwd(), 'client/dist'),
-  path.join(process.cwd(), 'dist')
+  path.resolve(__dirname, '../client/dist'),
+  path.resolve(process.cwd(), 'client/dist'),
+  path.resolve(__dirname, 'client/dist'),
+  path.resolve(__dirname, 'dist'),
+  path.resolve(process.cwd(), 'dist')
 ];
 
-const clientDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || path.join(__dirname, '../client/dist');
+const clientDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || path.resolve(__dirname, '../client/dist');
 const indexPath = path.join(clientDistPath, 'index.html');
 
-console.log(`[Static Serving] Client dist path resolved to: ${clientDistPath} (index.html exists: ${fs.existsSync(indexPath)})`);
+console.log(`[Static Serving] Absolute dist path: ${clientDistPath} (index.html exists: ${fs.existsSync(indexPath)})`);
 
 // Serve static files from the client build directory in production
 app.use(express.static(clientDistPath));
+app.use('/assets', express.static(path.join(clientDistPath, 'assets')));
 
 // Catch-all route to return React index.html for SPA routing
 try {
