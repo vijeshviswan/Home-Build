@@ -517,6 +517,22 @@ app.delete('/api/cash-sources/:id', async (req, res) => {
   }
 });
 
+// Serve static files from the client build directory in production
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+
+// Catch-all route to return React index.html for SPA routing
+try {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} catch (e) {
+  // Express 5 path-to-regexp wildcard syntax support
+  app.get('{*path}', (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
 // Global error handler (handles multer limits and fileFilter errors)
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
