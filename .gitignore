@@ -1,0 +1,20 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependency directories
+node_modules/
+
+# Credentials & secrets
+*credentials*.json
+google-credentials.json
+server/google-credentials.json
+
+# Uploads & temporary media
+server/uploads/
+uploads/
+
+# OS files
+.DS_Store
+Thumbs.db

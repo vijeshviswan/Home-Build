@@ -30,6 +30,14 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  proofFileId: {
+    type: String,
+    default: ''
+  },
+  proofUrl: {
+    type: String,
+    default: ''
+  },
   isBuilderPayment: {
     type: Boolean,
     default: false

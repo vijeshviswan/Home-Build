@@ -10,6 +10,16 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
     builderContractAmount: ''
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [googleAuth, setGoogleAuth] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/auth/google/status')
+        .then(r => r.json())
+        .then(data => setGoogleAuth(data))
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (settings) {
@@ -47,12 +57,60 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
         <div className="modal-header">
           <h2 className="modal-title">Project & Loan Settings</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <X size={22} />
+          <button className="icon-btn modal-close-btn" onClick={onClose} aria-label="Close">
+            <X size={20} strokeWidth={2.5} />
           </button>
         </div>
+
+        {/* GOOGLE DRIVE STORAGE STATUS CARD */}
+        {googleAuth && (
+          <div style={{
+            background: googleAuth.authenticated ? '#ecfdf5' : '#eff6ff',
+            border: `1px solid ${googleAuth.authenticated ? '#a7f3d0' : '#bfdbfe'}`,
+            borderRadius: '14px',
+            padding: '12px 16px',
+            marginBottom: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: googleAuth.authenticated ? '#065f46' : '#1e40af' }}>
+                Google Drive: {googleAuth.authenticated ? 'Connected' : 'Not Connected'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: googleAuth.authenticated ? '#047857' : '#3b82f6', marginTop: '2px' }}>
+                {googleAuth.authenticated ? `${googleAuth.account} (Personal Drive)` : 'Authorize to enable payment proof uploads'}
+              </div>
+            </div>
+            {googleAuth.authenticated ? (
+              <span style={{ background: '#10b981', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px' }}>
+                Active
+              </span>
+            ) : (
+              <a
+                href="/api/auth/google/url?redirect=true"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  background: '#2563eb',
+                  color: 'white',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Connect
+              </a>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

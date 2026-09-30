@@ -13,25 +13,14 @@ export default function PaymentList({ payments, onSelectPayment, onNavigateNewPa
   const totalAmount = filtered.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
   return (
-    <div>
+    <div className="page-wrapper">
       {/* QUICK CATEGORY PILLS */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '4px' }}>
+      <div className="category-pill-group">
         {['All', 'Own Cash', 'Loan Cash'].map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '9999px',
-              border: activeCategory === cat ? '1px solid #0284c7' : '1px solid #e2e8f0',
-              backgroundColor: activeCategory === cat ? '#0284c7' : '#ffffff',
-              color: activeCategory === cat ? '#ffffff' : '#475569',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease'
-            }}
+            className={`category-pill ${activeCategory === cat ? 'active' : ''}`}
           >
             {cat}
           </button>
@@ -39,20 +28,11 @@ export default function PaymentList({ payments, onSelectPayment, onNavigateNewPa
       </div>
 
       {/* SUMMARY BAR */}
-      <div style={{ 
-        background: '#ffffff', 
-        padding: '12px 16px', 
-        borderRadius: '14px', 
-        border: '1px solid #e2e8f0',
-        marginBottom: '16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+      <div className="summary-counter-card">
+        <span className="summary-counter-label">
           {filtered.length} {filtered.length === 1 ? 'Payment' : 'Payments'}
         </span>
-        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+        <span className="summary-counter-amount">
           {formatCurrency(totalAmount)}
         </span>
       </div>

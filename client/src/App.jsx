@@ -256,7 +256,13 @@ export default function App() {
       {/* MAIN VIEW */}
       <main className="main-content">
         {activeTab === 'dashboard' && (
-          <Dashboard onNavigate={handleTabChange} />
+          <Dashboard 
+            onNavigate={handleTabChange}
+            dashboardData={dashboardData}
+            builderData={builderData}
+            totalCashReceived={totalCashReceived}
+            payments={payments}
+          />
         )}
 
         {(activeTab === 'total-cost' || activeTab === 'payments') && (

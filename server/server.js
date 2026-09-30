@@ -1,17 +1,22 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
 const Payment = require('./models/Payment');
 const ProjectSettings = require('./models/ProjectSettings');
 const CashSource = require('./models/CashSource');
+const { uploadImageToDrive, deleteFileFromDrive } = require('./services/googleDriveService');
+const { generateAuthUrl, exchangeCodeForTokens, isOAuthReady } = require('./services/googleOAuthService');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/house_payment_tracker';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // Middleware
 app.use(cors());
@@ -24,21 +29,17 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Multer Storage Configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `proof-${uniqueSuffix}${ext}`);
-  }
-});
-
+// Multer Memory Storage Configuration (keeps buffer in RAM for streaming directly to Drive)
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files (JPEG, PNG, WebP, etc.) are allowed for payment proof.'));
+    }
+  }
 });
 
 // Helper: Ensure default settings exist
@@ -132,6 +133,102 @@ async function seedInitialData() {
 }
 
 // ==================== ROUTES ==================== //
+
+// 0. GOOGLE OAUTH 2.0 ROUTES
+app.get('/api/auth/google/status', (req, res) => {
+  const isReady = isOAuthReady();
+  res.json({
+    authenticated: isReady,
+    account: 'vijeshviswanv@gmail.com',
+    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
+    authMode: isReady ? 'OAuth2 (Personal Drive)' : 'Not Connected'
+  });
+});
+
+app.get('/api/auth/google/url', (req, res) => {
+  try {
+    const redirectUri = req.query.redirect_uri || 
+      process.env.GOOGLE_REDIRECT_URI || 
+      `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    const authUrl = generateAuthUrl(redirectUri);
+
+    if (req.query.redirect === 'true' || req.headers.accept?.includes('text/html')) {
+      return res.redirect(authUrl);
+    }
+    res.json({ authUrl, redirectUri });
+  } catch (err) {
+    console.error('Error generating Google Auth URL:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res.status(400).send(`
+      <div style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px 20px;">
+        <h2 style="color: #ef4444;">Google Authorization Denied</h2>
+        <p>${error}</p>
+        <a href="http://localhost:3000" style="display: inline-block; margin-top: 15px; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: 600;">Return to App</a>
+      </div>
+    `);
+  }
+
+  if (!code) {
+    return res.status(400).send('<h3>Missing authorization code from Google</h3>');
+  }
+
+  try {
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    await exchangeCodeForTokens(code, redirectUri);
+    console.log('[Google OAuth] Successfully authenticated and saved refresh token to .env');
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Google Drive Connected - House Finance</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+          .card { background: white; border-radius: 24px; padding: 40px 32px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0; }
+          .badge { width: 64px; height: 64px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 28px; }
+          h1 { font-size: 22px; font-weight: 700; margin: 0 0 12px 0; color: #0f172a; }
+          p { font-size: 15px; color: #64748b; line-height: 1.5; margin: 0 0 24px 0; }
+          .highlight { background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #334155; }
+          .btn { display: inline-block; width: 100%; box-sizing: border-box; background: #4f46e5; color: white; padding: 14px 24px; border-radius: 12px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
+          .btn:hover { background: #4338ca; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">✓</div>
+          <h1>Google Drive Connected!</h1>
+          <p>
+            Account <strong>vijeshviswanv@gmail.com</strong> is authorized. 
+            The refresh token has been written into <span class="highlight">.env</span>.
+            Payment proofs will now upload directly into your Google Drive folder without storage quota errors.
+          </p>
+          <a href="http://localhost:3000" class="btn">Return to House Finance</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error exchanging Google authorization code:', err.message);
+    res.status(500).send(`
+      <div style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px 20px; color: #1e293b;">
+        <h2 style="color: #ef4444;">Token Exchange Failed</h2>
+        <p style="color: #64748b;">${err.message}</p>
+        <p style="font-size: 14px; color: #94a3b8; max-width: 460px; margin: 15px auto;">
+          If you see a redirect_uri_mismatch error, ensure the exact redirect URI is configured in your Google Cloud Console Credentials.
+        </p>
+        <a href="http://localhost:3000" style="display: inline-block; margin-top: 15px; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: 600;">Back to App</a>
+      </div>
+    `);
+  }
+});
 
 // 1. DASHBOARD SUMMARY
 app.get('/api/dashboard', async (req, res) => {
@@ -227,7 +324,7 @@ app.get('/api/payments', async (req, res) => {
   }
 });
 
-// 3. CREATE PAYMENT
+// 3. CREATE PAYMENT (Google Drive Upload)
 app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
   try {
     const { date, category, paymentMethod, amount, description, isBuilderPayment } = req.body;
@@ -236,9 +333,26 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
       return res.status(400).json({ error: 'Please provide all required fields' });
     }
 
-    let proofImagePath = '';
+    let proofFileId = '';
+    let proofUrl = '';
+
+    // Handle image upload directly to Google Drive if a file was attached
     if (req.file) {
-      proofImagePath = `/uploads/${req.file.filename}`;
+      try {
+        const driveResult = await uploadImageToDrive(
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype
+        );
+        proofFileId = driveResult.fileId;
+        proofUrl = driveResult.proofUrl || driveResult.webViewLink;
+        console.log(`Successfully uploaded proof image to Google Drive. File ID: ${proofFileId}`);
+      } catch (driveErr) {
+        console.error('Google Drive upload failed:', driveErr.message);
+        return res.status(502).json({
+          error: `Google Drive upload failed: ${driveErr.message}`
+        });
+      }
     }
 
     const newPayment = await Payment.create({
@@ -247,7 +361,9 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
       paymentMethod,
       amount: parseFloat(amount),
       description: description.trim(),
-      proofImage: proofImagePath,
+      proofImage: proofUrl, // keep in sync for seamless backward compatibility
+      proofFileId,
+      proofUrl,
       isBuilderPayment: isBuilderPayment === 'true' || isBuilderPayment === true
     });
 
@@ -279,14 +395,19 @@ app.delete('/api/payments/:id', async (req, res) => {
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    // Optional: remove file if exists
-    if (payment.proofImage) {
+    // Delete file from Google Drive if proofFileId exists
+    if (payment.proofFileId) {
+      await deleteFileFromDrive(payment.proofFileId);
+    }
+
+    // Delete local fallback file if exists
+    if (payment.proofImage && payment.proofImage.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, payment.proofImage);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
         } catch (e) {
-          console.warn('Could not delete image file:', e);
+          console.warn('Could not delete local image file:', e);
         }
       }
     }
@@ -394,6 +515,19 @@ app.delete('/api/cash-sources/:id', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete cash source' });
   }
+});
+
+// Global error handler (handles multer limits and fileFilter errors)
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File size exceeds the 15MB limit.' });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  } else if (err) {
+    return res.status(400).json({ error: err.message || 'An error occurred during request processing.' });
+  }
+  next();
 });
 
 // Connect to MongoDB and start server

@@ -23,12 +23,17 @@ export default function PinScreen({ onUnlock }) {
     <div className="pin-screen-container">
       <div className="pin-card">
         {/* ICON & APP BRANDING */}
+        <div className="pin-badge">
+          <Lock size={12} strokeWidth={2.5} />
+          <span>Secure Personal Tracker</span>
+        </div>
+
         <div className="pin-icon-box">
-          <Home size={30} strokeWidth={2.2} />
+          <Home size={32} strokeWidth={2.4} />
         </div>
 
         <h1 className="pin-app-title">House Finance</h1>
-        <p className="pin-subtitle">Enter Access PIN</p>
+        <p className="pin-subtitle">Enter Access PIN to continue</p>
 
         {/* PIN FORM */}
         <form onSubmit={handleSubmit} className="pin-form">

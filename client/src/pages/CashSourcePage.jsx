@@ -65,28 +65,29 @@ export default function CashSourcePage({
   };
 
   return (
-    <div>
+    <div className="page-wrapper">
       {/* 1. TOTAL CASH RECEIVED SUMMARY TILE */}
-      <div className="tile" style={{ marginBottom: '16px' }}>
+      <div className="tile hero-tile-mint" style={{ marginBottom: '16px' }}>
         <div className="tile-header">
           <div className="tile-title-group">
-            <div className="tile-badge-icon badge-indigo">
+            <div className="tile-badge-icon badge-mint">
               <Wallet size={20} />
             </div>
             <div>
               <div className="tile-title">Source of Cash</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Borrowed & personal funding</div>
+              <div className="tile-subtitle-text">Borrowed & personal funding</div>
             </div>
           </div>
         </div>
 
-        <div className="tile-row">
-          <span className="tile-label" style={{ fontWeight: 600, color: '#0f172a' }}>
-            Total Cash Received
-          </span>
-          <span className="tile-value-large tile-value-green">
-            {formatCurrency(totalCashReceived)}
-          </span>
+        <div className="tile-hero-amount-block">
+          <span className="tile-hero-label">Total Cash Received</span>
+          <div className="tile-hero-val-row">
+            <span className="tile-value-large tile-value-green">
+              {formatCurrency(totalCashReceived)}
+            </span>
+            <span className="tile-hero-pill-badge pill-mint">{cashSources.length} {cashSources.length === 1 ? 'Source' : 'Sources'}</span>
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Check, ArrowRight } from 'lucide-react';
+import { Camera, X, Check } from 'lucide-react';
 import { toInputDate } from '../utils/formatters';
 
 export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder = false }) {

@@ -3,7 +3,6 @@ import {
   HardHat, 
   Plus, 
   AlertCircle, 
-  CheckCircle, 
   FileText,
   SlidersHorizontal 
 } from 'lucide-react';
@@ -25,22 +24,26 @@ export default function BuilderPage({
     payments = []
   } = builderData || {};
 
+  const paidPercentage = contractAmount > 0 
+    ? Math.min(100, Math.round((totalPaid / contractAmount) * 100)) 
+    : 0;
+
   return (
-    <div>
+    <div className="page-wrapper">
       {/* BUILDER SUMMARY TILE */}
-      <div className="tile" style={{ marginBottom: '16px' }}>
+      <div className="tile hero-tile-amber" style={{ marginBottom: '16px' }}>
         <div className="tile-header">
           <div className="tile-title-group">
-            <div className="tile-badge-icon badge-indigo">
+            <div className="tile-badge-icon badge-amber">
               <HardHat size={18} />
             </div>
             <div>
               <div className="tile-title">{builderName}</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Main Contractor</div>
+              <div className="tile-subtitle-text">Main Contractor</div>
             </div>
           </div>
           <button 
-            className="icon-btn"
+            className="icon-btn tile-settings-btn"
             onClick={onOpenSettings}
             title="Edit Builder Details"
           >
@@ -48,39 +51,46 @@ export default function BuilderPage({
           </button>
         </div>
 
-        <div className="tile-row">
-          <span className="tile-label">Total Contract Amount</span>
-          <span className="tile-value">
-            {formatCurrency(contractAmount)}
-          </span>
+        <div className="tile-hero-amount-block">
+          <span className="tile-hero-label">Remaining Balance</span>
+          <div className="tile-hero-val-row">
+            <span className="tile-value-large tile-value-amber">
+              {formatCurrency(balance)}
+            </span>
+            <span className="tile-hero-pill-badge pill-amber">{paidPercentage}% Paid</span>
+          </div>
         </div>
 
-        <div className="tile-row">
-          <span className="tile-label">Total Paid to Builder</span>
-          <span className="tile-value tile-value-green">
-            {formatCurrency(totalPaid)}
-          </span>
+        {/* PROGRESS TRACK */}
+        <div className="progress-track-wrapper">
+          <div className="progress-track">
+            <div className="progress-fill progress-fill-amber" style={{ width: `${paidPercentage}%` }} />
+          </div>
         </div>
 
-        <div className="divider" />
-
-        <div className="tile-row">
-          <span className="tile-label" style={{ fontWeight: 600, color: '#0f172a' }}>
-            Remaining Balance
-          </span>
-          <span className="tile-value-large">
-            {formatCurrency(balance)}
-          </span>
+        <div className="tile-stat-grid">
+          <div className="tile-stat-item">
+            <span className="tile-stat-label">Contract Amount</span>
+            <span className="tile-stat-value">
+              {formatCurrency(contractAmount)}
+            </span>
+          </div>
+          <div className="tile-stat-item">
+            <span className="tile-stat-label">Total Paid</span>
+            <span className="tile-stat-value" style={{ color: '#10b981' }}>
+              {formatCurrency(totalPaid)}
+            </span>
+          </div>
         </div>
 
         {extraPaid > 0 && (
-          <div style={{ marginTop: '10px', padding: '10px 14px', background: '#fff1f2', borderRadius: '12px', border: '1px solid #fecdd3', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={18} color="#e11d48" />
+          <div className="builder-extra-alert">
+            <AlertCircle size={20} className="extra-alert-icon" />
             <div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#be123c' }}>
+              <div className="extra-alert-label">
                 Extra Money Paid to Builder
               </div>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e11d48' }}>
+              <div className="extra-alert-val">
                 {formatCurrency(extraPaid)}
               </div>
             </div>

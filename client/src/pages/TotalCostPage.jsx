@@ -15,6 +15,7 @@ export default function TotalCostPage({
   const totalBuildingCost = dashboardData?.totalBuildingCost || 0;
   const totalAmountPaid = dashboardData?.totalAmountPaid || 0;
   const remainingBudget = Math.max(0, totalBuildingCost - totalAmountPaid);
+  const paidPercentage = totalBuildingCost > 0 ? Math.min(100, Math.round((totalAmountPaid / totalBuildingCost) * 100)) : 0;
 
   const filtered = activeCategory === 'All' 
     ? payments 
@@ -23,21 +24,21 @@ export default function TotalCostPage({
   const filteredTotal = filtered.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
   return (
-    <div>
+    <div className="page-wrapper">
       {/* TOTAL COST SUMMARY CARD */}
-      <div className="tile" style={{ marginBottom: '16px' }}>
+      <div className="tile hero-tile-coral" style={{ marginBottom: '16px' }}>
         <div className="tile-header">
           <div className="tile-title-group">
-            <div className="tile-badge-icon badge-blue">
+            <div className="tile-badge-icon badge-coral">
               <Building size={20} />
             </div>
             <div>
               <div className="tile-title">Total Construction Cost</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Estimated budget vs paid</div>
+              <div className="tile-subtitle-text">Estimated budget vs paid</div>
             </div>
           </div>
           <button 
-            className="icon-btn" 
+            className="icon-btn tile-settings-btn" 
             onClick={onOpenSettings}
             title="Edit Budget"
           >
@@ -45,27 +46,36 @@ export default function TotalCostPage({
           </button>
         </div>
 
-        <div className="tile-row">
-          <span className="tile-label">Total Amount Paid</span>
-          <span className="tile-value-large tile-value-green">
-            {formatCurrency(totalAmountPaid)}
-          </span>
+        <div className="tile-hero-amount-block">
+          <span className="tile-hero-label">Total Amount Paid</span>
+          <div className="tile-hero-val-row">
+            <span className="tile-value-large tile-value-green">
+              {formatCurrency(totalAmountPaid)}
+            </span>
+            <span className="tile-hero-pill-badge">{paidPercentage}% Paid</span>
+          </div>
         </div>
 
-        <div className="divider" />
-
-        <div className="tile-row">
-          <span className="tile-label">Total Building Cost (Budget)</span>
-          <span className="tile-value">
-            {formatCurrency(totalBuildingCost)}
-          </span>
+        {/* PROGRESS TRACK */}
+        <div className="progress-track-wrapper">
+          <div className="progress-track">
+            <div className="progress-fill progress-fill-coral" style={{ width: `${paidPercentage}%` }} />
+          </div>
         </div>
 
-        <div className="tile-row">
-          <span className="tile-label">Remaining Budget</span>
-          <span className="tile-value" style={{ color: remainingBudget > 0 ? '#0284c7' : '#e11d48' }}>
-            {formatCurrency(remainingBudget)}
-          </span>
+        <div className="tile-stat-grid">
+          <div className="tile-stat-item">
+            <span className="tile-stat-label">Total Building Budget</span>
+            <span className="tile-stat-value">
+              {formatCurrency(totalBuildingCost)}
+            </span>
+          </div>
+          <div className="tile-stat-item">
+            <span className="tile-stat-label">Remaining Budget</span>
+            <span className="tile-stat-value" style={{ color: remainingBudget > 0 ? '#0284c7' : '#e11d48' }}>
+              {formatCurrency(remainingBudget)}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -83,20 +93,11 @@ export default function TotalCostPage({
       </div>
 
       {/* SUMMARY COUNT */}
-      <div style={{ 
-        background: '#ffffff', 
-        padding: '12px 16px', 
-        borderRadius: '14px', 
-        border: '1px solid #e2e8f0',
-        marginBottom: '16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+      <div className="summary-counter-card">
+        <span className="summary-counter-label">
           {filtered.length} {filtered.length === 1 ? 'Payment' : 'Payments'}
         </span>
-        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+        <span className="summary-counter-amount">
           {formatCurrency(filteredTotal)}
         </span>
       </div>

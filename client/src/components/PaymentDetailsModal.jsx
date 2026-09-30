@@ -24,16 +24,17 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
         <div className="modal-header">
           <h2 className="modal-title">Payment Details</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <X size={22} />
+          <button className="icon-btn modal-close-btn" onClick={onClose} aria-label="Close">
+            <X size={20} strokeWidth={2.5} />
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', margin: '8px 0 20px' }}>
-          <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '4px' }}>Amount Paid</div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a' }}>
+        <div className="modal-amount-hero">
+          <div className="modal-amount-label">Amount Paid</div>
+          <div className="modal-amount-value">
             {formatCurrency(payment.amount)}
           </div>
         </div>
@@ -76,32 +77,40 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete }) {
             </span>
           </div>
 
-          {payment.proofImage && (
-            <div style={{ marginTop: '16px' }}>
-              <div className="detail-label" style={{ marginBottom: '8px' }}>
-                Uploaded Cheque / Proof:
+          {(() => {
+            const proofSrc = payment.proofUrl || payment.proofImage;
+            if (!proofSrc) return null;
+            return (
+              <div style={{ marginTop: '16px' }}>
+                <div className="detail-label" style={{ marginBottom: '8px' }}>
+                  Uploaded Cheque / Proof:
+                </div>
+                <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', textAlign: 'center' }}>
+                  <a href={proofSrc} target="_blank" rel="noreferrer" title="Open full image">
+                    <img
+                      src={proofSrc}
+                      alt="Proof"
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block' }}
+                      onError={(e) => {
+                        // If direct drive image embed fails, hide broken img icon
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </a>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                  <a 
+                    href={proofSrc} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    style={{ fontSize: '0.84rem', color: '#6366f1', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <ExternalLink size={14} /> View full resolution {payment.proofFileId ? '(Google Drive)' : ''}
+                  </a>
+                </div>
               </div>
-              <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', textAlign: 'center' }}>
-                <a href={payment.proofImage} target="_blank" rel="noreferrer" title="Open full image">
-                  <img
-                    src={payment.proofImage}
-                    alt="Proof"
-                    style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block' }}
-                  />
-                </a>
-              </div>
-              <div style={{ textAlign: 'center', marginTop: '6px' }}>
-                <a 
-                  href={payment.proofImage} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  style={{ fontSize: '0.8rem', color: '#0284c7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <ExternalLink size={13} /> View full resolution
-                </a>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         <div style={{ marginTop: '24px', display: 'flex', gap: '10px' }}>

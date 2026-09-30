@@ -6,6 +6,7 @@
     "server": "cd server && node server.js",
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "auth:google": "cd server && node scripts/get-google-token.js",
     "build": "cd client && npm run build"
   },
   "devDependencies": {
