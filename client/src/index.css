@@ -1005,6 +1005,7 @@ body {
   gap: 12px;
   flex: 1;
   min-width: 0;
+  max-width: 230px;
 }
 
 .payment-avatar {
