@@ -51,8 +51,8 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
     <div className="print-page-wrapper">
       {/* CONTROLS BAR (Hidden during print) */}
       <div className="print-controls-bar no-print">
-        <div style={{ flex: 1 }}>
-          <label className="form-label" htmlFor="select-statement-month" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>
+        <div style={{ flex: 1, minWidth: '180px' }}>
+          <label className="form-label" htmlFor="select-statement-month" style={{ fontSize: '0.82rem', marginBottom: '6px' }}>
             Select Month
           </label>
           <input
@@ -61,7 +61,7 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
             className="form-input"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{ padding: '9px 12px', fontSize: '0.9rem' }}
+            style={{ padding: '11px 14px' }}
           />
         </div>
 
@@ -71,15 +71,13 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
           id="btn-print-report"
           style={{
             flex: 'none',
-            width: 'auto',
-            padding: '10px 18px',
-            fontSize: '0.9rem',
+            padding: '12px 22px',
             marginTop: 'auto',
-            height: '42px'
+            height: '46px'
           }}
         >
           <Printer size={18} />
-          Print
+          <span>Print / Save PDF</span>
         </button>
       </div>
 

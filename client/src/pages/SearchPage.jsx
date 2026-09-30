@@ -78,7 +78,7 @@ export default function SearchPage({ payments, onSelectPayment }) {
             </label>
             <select
               className="form-select"
-              style={{ padding: '9px 10px', fontSize: '0.85rem' }}
+              style={{ padding: '10px 12px' }}
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               id="filter-category"
@@ -107,7 +107,7 @@ export default function SearchPage({ payments, onSelectPayment }) {
             <input
               type="date"
               className="form-input"
-              style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+              style={{ padding: '10px 12px' }}
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
               id="filter-date"
