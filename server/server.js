@@ -517,19 +517,32 @@ app.delete('/api/cash-sources/:id', async (req, res) => {
   }
 });
 
+// Determine absolute path to the client build directory
+const possibleDistPaths = [
+  path.join(__dirname, '../client/dist'),
+  path.join(__dirname, 'client/dist'),
+  path.join(__dirname, 'dist'),
+  path.join(process.cwd(), 'client/dist'),
+  path.join(process.cwd(), 'dist')
+];
+
+const clientDistPath = possibleDistPaths.find(p => fs.existsSync(path.join(p, 'index.html'))) || path.join(__dirname, '../client/dist');
+const indexPath = path.join(clientDistPath, 'index.html');
+
+console.log(`[Static Serving] Client dist path resolved to: ${clientDistPath} (index.html exists: ${fs.existsSync(indexPath)})`);
+
 // Serve static files from the client build directory in production
-const clientDistPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
 
 // Catch-all route to return React index.html for SPA routing
 try {
   app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+    res.sendFile(indexPath);
   });
 } catch (e) {
   // Express 5 path-to-regexp wildcard syntax support
   app.get('{*path}', (req, res) => {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+    res.sendFile(indexPath);
   });
 }
 

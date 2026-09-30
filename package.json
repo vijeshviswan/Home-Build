@@ -7,7 +7,8 @@
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "auth:google": "cd server && node scripts/get-google-token.js",
-    "build": "cd client && npm run build"
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "start": "node server/server.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.4"
