@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Home, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 
-const CORRECT_PIN = '27426840';
+const CORRECT_PIN = '2742';
 
 export default function PinScreen({ onUnlock }) {
   const [pin, setPin] = useState('');
