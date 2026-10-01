@@ -1,11 +1,16 @@
 import React from 'react';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { Paperclip, HardHat, Landmark, IndianRupee, ChevronRight } from 'lucide-react';
+import { Paperclip, ChevronRight } from 'lucide-react';
+import { getCategoryMeta } from '../utils/categories';
 
 export default function PaymentCard({ payment, onSelect }) {
   const sourceName = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category) || 'Own Cash';
   const isLoan = sourceName === 'Home Loan';
   const isBuilder = payment.isBuilderPayment;
+  
+  const categoryName = payment.expenseCategory || (payment.isBuilderPayment ? 'Builder / Contractor' : 'Others');
+  const catMeta = getCategoryMeta(categoryName);
+  const CatIcon = catMeta.icon;
 
   return (
     <div 
@@ -14,14 +19,15 @@ export default function PaymentCard({ payment, onSelect }) {
     >
       <div className="payment-card-header">
         <div className="payment-card-avatar-group">
-          <div className={`payment-avatar ${isBuilder ? 'avatar-builder' : isLoan ? 'avatar-loan' : 'avatar-own'}`}>
-            {isBuilder ? (
-              <HardHat size={18} strokeWidth={2.2} />
-            ) : isLoan ? (
-              <Landmark size={18} strokeWidth={2.2} />
-            ) : (
-              <IndianRupee size={18} strokeWidth={2.4} />
-            )}
+          <div 
+            className="payment-avatar"
+            style={{ 
+              backgroundColor: catMeta.bg, 
+              color: catMeta.color, 
+              border: `1px solid ${catMeta.border}` 
+            }}
+          >
+            <CatIcon size={18} strokeWidth={2.2} />
           </div>
           <div className="payment-card-meta">
             <div className="payment-card-desc">
@@ -43,17 +49,16 @@ export default function PaymentCard({ payment, onSelect }) {
 
       <div className="payment-card-footer">
         <div className="tags-group">
+          <span className={`tag ${catMeta.tagClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <CatIcon size={12} strokeWidth={2.4} />
+            {catMeta.label}
+          </span>
           <span className={`tag ${isLoan ? 'tag-loan' : 'tag-own'}`}>
             {sourceName}
           </span>
           <span className="tag tag-method">
             {payment.paymentMethod}
           </span>
-          {payment.isBuilderPayment && (
-            <span className="tag tag-builder">
-              Builder
-            </span>
-          )}
         </div>
 
         {(payment.proofUrl || payment.proofImage) && (

@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const EXPENSE_CATEGORIES = [
+  'Builder / Contractor',
+  'Materials',
+  'Electrical & Plumbing',
+  'Labor / Workers',
+  'Government / Approvals',
+  'Others'
+];
+
 const paymentSchema = new mongoose.Schema({
   date: {
     type: Date,
@@ -11,6 +20,12 @@ const paymentSchema = new mongoose.Schema({
     enum: ['Own Cash', 'Home Loan'],
     default: 'Own Cash',
     required: [true, 'Payment source is required']
+  },
+  expenseCategory: {
+    type: String,
+    enum: EXPENSE_CATEGORIES,
+    default: 'Others',
+    trim: true
   },
   category: {
     type: String,
@@ -74,6 +89,17 @@ paymentSchema.pre('validate', function() {
     this.paymentSource = 'Own Cash';
     this.category = 'Own Cash';
   }
+
+  // Synchronize expenseCategory and isBuilderPayment
+  if (this.expenseCategory === 'Builder / Contractor') {
+    this.isBuilderPayment = true;
+  } else if (this.isBuilderPayment && (!this.expenseCategory || this.expenseCategory === 'Others')) {
+    this.expenseCategory = 'Builder / Contractor';
+  } else if (!this.expenseCategory) {
+    this.expenseCategory = 'Others';
+  }
 });
+
+paymentSchema.statics.EXPENSE_CATEGORIES = EXPENSE_CATEGORIES;
 
 module.exports = mongoose.model('Payment', paymentSchema);

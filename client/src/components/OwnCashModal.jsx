@@ -14,6 +14,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { formatCurrency, formatDate, toInputDate } from '../utils/formatters';
+import { getCategoryMeta } from '../utils/categories';
 
 export default function OwnCashModal({
   isOpen,
@@ -500,9 +501,16 @@ export default function OwnCashModal({
                     </div>
                     <div>
                       <div className="fund-item-title">{p.description}</div>
-                      <div className="fund-item-meta">
-                        {formatDate(p.date)} • {p.paymentMethod}
-                        {p.isBuilderPayment && <span className="tag-mini-builder">Builder</span>}
+                      <div className="fund-item-meta" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                        <span>{formatDate(p.date)} • {p.paymentMethod}</span>
+                        {(() => {
+                          const catMeta = getCategoryMeta(p.expenseCategory || (p.isBuilderPayment ? 'Builder / Contractor' : 'Others'));
+                          return (
+                            <span className={`tag-mini-cat ${catMeta.tagClass}`}>
+                              {catMeta.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

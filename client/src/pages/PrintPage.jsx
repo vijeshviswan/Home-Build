@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Printer, Calendar, FileText, CheckCircle, ArrowDownLeft, ArrowUpRight, Wallet, Landmark } from 'lucide-react';
+import { Printer, Calendar, FileText, CheckCircle, ArrowDownLeft, ArrowUpRight, Wallet, Landmark, Layers } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { EXPENSE_CATEGORIES, getCategoryMeta } from '../utils/categories';
 
 export default function PrintPage({ payments, cashSources, dashboardData }) {
   // Current month default in YYYY-MM format
@@ -48,6 +49,21 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
   const totalBuilderPayments = monthBuilderPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalOtherPayments = monthOtherPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalPayments = totalBuilderPayments + totalOtherPayments;
+
+  const monthCategoryStats = EXPENSE_CATEGORIES.map(cat => {
+    const catPayments = monthPayments.filter(p => {
+      const pCat = p.expenseCategory || (p.isBuilderPayment ? 'Builder / Contractor' : 'Others');
+      return pCat === cat.id;
+    });
+    const total = catPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const percentage = totalPayments > 0 ? Math.round((total / totalPayments) * 100) : 0;
+    return {
+      ...cat,
+      count: catPayments.length,
+      totalSpent: total,
+      percentage
+    };
+  }).filter(c => c.count > 0);
 
   const monthOwnCashSpent = monthOwnCashPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const monthHomeLoanSpent = monthHomeLoanPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -241,6 +257,43 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
             2. Construction Expenses Paid ({monthPayments.length})
           </div>
 
+          {/* MONTH CATEGORY BREAKDOWN TABLE */}
+          {monthCategoryStats.length > 0 && (
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                Expense Breakdown by Category
+              </div>
+              <div className="table-wrapper-block">
+                <table className="statement-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Payments</th>
+                      <th style={{ textAlign: 'right' }}>Share</th>
+                      <th style={{ textAlign: 'right' }}>Total Spent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthCategoryStats.map((c) => (
+                      <tr key={c.id}>
+                        <td style={{ fontWeight: 600 }}>
+                          <span className={`tag ${c.tagClass}`}>
+                            {c.label}
+                          </span>
+                        </td>
+                        <td>{c.count}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#64748b' }}>{c.percentage}%</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                          {formatCurrency(c.totalSpent)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* BUILDER PAYMENTS */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
@@ -255,31 +308,41 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                     <tr>
                       <th>Date</th>
                       <th>Description</th>
+                      <th>Category</th>
                       <th>Source</th>
                       <th>Method</th>
                       <th style={{ textAlign: 'right' }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {monthBuilderPayments.map((p) => (
-                      <tr key={p._id}>
-                        <td>{formatDate(p.date)}</td>
-                        <td style={{ fontWeight: 600 }}>{p.description}</td>
-                        <td>
-                          <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
-                            {getSourceLabel(p)}
-                          </span>
-                        </td>
-                        <td>{p.paymentMethod}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {formatCurrency(p.amount)}
-                        </td>
-                      </tr>
-                    ))}
+                    {monthBuilderPayments.map((p) => {
+                      const catName = p.expenseCategory || 'Builder / Contractor';
+                      const catMeta = getCategoryMeta(catName);
+                      return (
+                        <tr key={p._id}>
+                          <td>{formatDate(p.date)}</td>
+                          <td style={{ fontWeight: 600 }}>{p.description}</td>
+                          <td>
+                            <span className={`tag ${catMeta.tagClass}`}>
+                              {catMeta.label}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
+                              {getSourceLabel(p)}
+                            </span>
+                          </td>
+                          <td>{p.paymentMethod}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {formatCurrency(p.amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={4} style={{ fontWeight: 700 }}>Subtotal Builder</td>
+                      <td colSpan={5} style={{ fontWeight: 700 }}>Subtotal Builder</td>
                       <td style={{ textAlign: 'right', fontWeight: 800 }}>
                         {formatCurrency(totalBuilderPayments)}
                       </td>
@@ -304,31 +367,41 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                     <tr>
                       <th>Date</th>
                       <th>Description</th>
+                      <th>Category</th>
                       <th>Source</th>
                       <th>Method</th>
                       <th style={{ textAlign: 'right' }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {monthOtherPayments.map((p) => (
-                      <tr key={p._id}>
-                        <td>{formatDate(p.date)}</td>
-                        <td style={{ fontWeight: 600 }}>{p.description}</td>
-                        <td>
-                          <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
-                            {getSourceLabel(p)}
-                          </span>
-                        </td>
-                        <td>{p.paymentMethod}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {formatCurrency(p.amount)}
-                        </td>
-                      </tr>
-                    ))}
+                    {monthOtherPayments.map((p) => {
+                      const catName = p.expenseCategory || 'Others';
+                      const catMeta = getCategoryMeta(catName);
+                      return (
+                        <tr key={p._id}>
+                          <td>{formatDate(p.date)}</td>
+                          <td style={{ fontWeight: 600 }}>{p.description}</td>
+                          <td>
+                            <span className={`tag ${catMeta.tagClass}`}>
+                              {catMeta.label}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
+                              {getSourceLabel(p)}
+                            </span>
+                          </td>
+                          <td>{p.paymentMethod}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {formatCurrency(p.amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={4} style={{ fontWeight: 700 }}>Subtotal Other</td>
+                      <td colSpan={5} style={{ fontWeight: 700 }}>Subtotal Other</td>
                       <td style={{ textAlign: 'right', fontWeight: 800 }}>
                         {formatCurrency(totalOtherPayments)}
                       </td>

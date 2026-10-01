@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Camera, X, Check, Wallet, Landmark, AlertCircle } from 'lucide-react';
 import { toInputDate, formatCurrency } from '../utils/formatters';
+import { EXPENSE_CATEGORIES } from '../utils/categories';
 
 export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder = false, fundSources }) {
   const [date, setDate] = useState(toInputDate());
   const [paymentSource, setPaymentSource] = useState('Own Cash');
+  const [expenseCategory, setExpenseCategory] = useState(defaultIsBuilder ? 'Builder / Contractor' : 'Materials');
   const [paymentMethod, setPaymentMethod] = useState('Online');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -22,6 +24,11 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
   const parsedAmount = parseFloat(amount) || 0;
   const projectedRemaining = currentAvailable - parsedAmount;
   const isOverBalance = parsedAmount > currentAvailable && currentAvailable > 0;
+
+  const handleCategoryChange = (catId) => {
+    setExpenseCategory(catId);
+    setIsBuilderPayment(catId === 'Builder / Contractor');
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -59,6 +66,7 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
       const formData = new FormData();
       formData.append('date', date);
       formData.append('paymentSource', paymentSource);
+      formData.append('expenseCategory', expenseCategory);
       formData.append('category', paymentSource); // Sync for full backward compatibility
       formData.append('paymentMethod', paymentMethod);
       formData.append('amount', amount);
@@ -101,6 +109,42 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
               required
               autoFocus
             />
+          </div>
+        </div>
+
+        {/* EXPENSE CATEGORY / RECIPIENT TYPE */}
+        <div className="form-group">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label className="form-label" style={{ margin: 0 }}>
+              Payment Category / Service *
+            </label>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+              Select where money is paid
+            </span>
+          </div>
+
+          <div className="category-chips-grid">
+            {EXPENSE_CATEGORIES.map(cat => {
+              const IconComponent = cat.icon;
+              const isSelected = expenseCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`category-select-chip ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleCategoryChange(cat.id)}
+                  style={{
+                    borderColor: isSelected ? cat.color : '#e2e8f0',
+                    backgroundColor: isSelected ? cat.bg : '#ffffff',
+                    color: isSelected ? cat.color : '#334155'
+                  }}
+                  id={`cat-chip-${cat.id.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                >
+                  <IconComponent size={15} strokeWidth={2.4} />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

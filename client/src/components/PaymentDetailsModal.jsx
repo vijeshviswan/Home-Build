@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Trash2, Edit3, ExternalLink, Calendar, CreditCard, Tag, FileText, CheckCircle2, Camera, Check } from 'lucide-react';
 import { formatCurrency, formatDate, toInputDate } from '../utils/formatters';
+import { EXPENSE_CATEGORIES, getCategoryMeta } from '../utils/categories';
 
 export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpdate }) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -11,6 +12,9 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
   const [editAmount, setEditAmount] = useState(payment ? payment.amount : '');
   const [editDescription, setEditDescription] = useState(payment ? payment.description : '');
   const [editDate, setEditDate] = useState(payment ? toInputDate(payment.date) : toInputDate());
+  const [editCategory, setEditCategory] = useState(
+    payment ? (payment.expenseCategory || (payment.isBuilderPayment ? 'Builder / Contractor' : 'Others')) : 'Builder / Contractor'
+  );
   const [editSource, setEditSource] = useState(
     payment ? (payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category) || 'Own Cash') : 'Own Cash'
   );
@@ -24,6 +28,9 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
 
   const currentSource = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category) || 'Own Cash';
   const isLoan = currentSource === 'Home Loan';
+  const categoryName = payment.expenseCategory || (payment.isBuilderPayment ? 'Builder / Contractor' : 'Others');
+  const catMeta = getCategoryMeta(categoryName);
+  const CatIcon = catMeta.icon;
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this payment record?')) {
@@ -66,8 +73,9 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
       formData.append('date', editDate);
       formData.append('paymentSource', editSource);
       formData.append('category', editSource);
+      formData.append('expenseCategory', editCategory);
       formData.append('paymentMethod', editMethod);
-      formData.append('isBuilderPayment', editIsBuilder);
+      formData.append('isBuilderPayment', editCategory === 'Builder / Contractor' || editIsBuilder);
       if (newProofFile) {
         formData.append('proofImage', newProofFile);
       }
@@ -115,6 +123,16 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
               <div className="detail-row">
                 <span className="detail-label">Date</span>
                 <span className="detail-val">{formatDate(payment.date)}</span>
+              </div>
+
+              <div className="detail-row">
+                <span className="detail-label">Expense Category</span>
+                <span className="detail-val">
+                  <span className={`tag ${catMeta.tagClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <CatIcon size={13} strokeWidth={2.4} />
+                    {catMeta.label}
+                  </span>
+                </span>
               </div>
 
               <div className="detail-row">
@@ -284,6 +302,39 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
                 onChange={(e) => setEditDate(e.target.value)}
                 required
               />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Payment Category / Service *</label>
+              <div className="category-chips-grid">
+                {EXPENSE_CATEGORIES.map((cat) => {
+                  const IconComp = cat.icon;
+                  const isSelected = editCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={`category-select-chip ${isSelected ? 'selected' : ''}`}
+                      onClick={() => {
+                        setEditCategory(cat.id);
+                        if (cat.id === 'Builder / Contractor') {
+                          setEditIsBuilder(true);
+                        } else {
+                          setEditIsBuilder(false);
+                        }
+                      }}
+                      style={{
+                        borderColor: isSelected ? cat.color : '#e2e8f0',
+                        backgroundColor: isSelected ? cat.bg : '#ffffff',
+                        color: isSelected ? cat.color : '#334155'
+                      }}
+                    >
+                      <IconComp size={15} color={isSelected ? cat.color : '#64748b'} strokeWidth={2.2} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: isSelected ? 700 : 500 }}>{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="filter-row" style={{ marginBottom: '14px' }}>

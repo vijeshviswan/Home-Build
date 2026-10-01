@@ -108,7 +108,7 @@ async function migrateExistingData() {
       await homeLoan.save();
     }
 
-    // Migrate payments: populate paymentSource if missing or if category was Loan Cash
+    // Migrate payments: populate paymentSource and expenseCategory if missing
     const payments = await Payment.find();
     for (const p of payments) {
       let changed = false;
@@ -120,11 +120,15 @@ async function migrateExistingData() {
         p.category = 'Home Loan';
         changed = true;
       }
+      if (!p.expenseCategory) {
+        p.expenseCategory = p.isBuilderPayment ? 'Builder / Contractor' : 'Others';
+        changed = true;
+      }
       if (changed) {
         await p.save();
       }
     }
-    console.log('[Migration] Database schemas and fund sources initialized successfully.');
+    console.log('[Migration] Database schemas, fund sources, and payment categories initialized successfully.');
   } catch (err) {
     console.error('[Migration Error]:', err.message);
   }
@@ -360,6 +364,18 @@ app.get('/api/dashboard', async (req, res) => {
     const builderBalance = Math.max(0, builderContract - builderPaid);
     const builderExtraPaid = Math.max(0, builderPaid - builderContract);
 
+    // Category Breakdown by expenseCategory
+    const categoryBreakdownAgg = await Payment.aggregate([
+      { $group: { _id: '$expenseCategory', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      { $sort: { total: -1 } }
+    ]);
+    const categoryBreakdown = categoryBreakdownAgg.map(c => ({
+      category: c._id || 'Others',
+      totalSpent: c.total,
+      count: c.count,
+      percentage: totalAmountPaid > 0 ? Math.round((c.total / totalAmountPaid) * 100) : 0
+    }));
+
     // Recent payments (last 5)
     const recentPayments = await Payment.find()
       .sort({ date: -1, createdAt: -1 })
@@ -412,6 +428,8 @@ app.get('/api/dashboard', async (req, res) => {
         balanceAmount: builderBalance,
         extraPaid: builderExtraPaid
       },
+      categoryBreakdown,
+      categories: Payment.EXPENSE_CATEGORIES,
       recentPayments
     });
   } catch (error) {
@@ -423,21 +441,28 @@ app.get('/api/dashboard', async (req, res) => {
 // 2. GET PAYMENTS (with search & filter)
 app.get('/api/payments', async (req, res) => {
   try {
-    const { category, paymentSource, search, date, isBuilder } = req.query;
+    const { category, paymentSource, expenseCategory, search, date, isBuilder } = req.query;
     const filter = {};
 
-    const sourceFilter = paymentSource || category;
-    if (sourceFilter && sourceFilter !== 'All') {
-      if (sourceFilter === 'Own Cash') {
+    if (expenseCategory && expenseCategory !== 'All') {
+      filter.expenseCategory = expenseCategory;
+    }
+
+    if (paymentSource && paymentSource !== 'All') {
+      filter.paymentSource = paymentSource;
+    }
+
+    if (category && category !== 'All' && !paymentSource && !expenseCategory) {
+      if (category === 'Own Cash') {
         filter.$or = [{ paymentSource: 'Own Cash' }, { category: 'Own Cash' }];
-      } else if (sourceFilter === 'Home Loan' || sourceFilter === 'Loan Cash') {
+      } else if (category === 'Home Loan' || category === 'Loan Cash') {
         filter.$or = [
           { paymentSource: 'Home Loan' },
           { category: 'Home Loan' },
           { category: 'Loan Cash' }
         ];
       } else {
-        filter.category = sourceFilter;
+        filter.expenseCategory = category;
       }
     }
 
@@ -470,10 +495,15 @@ app.get('/api/payments', async (req, res) => {
   }
 });
 
+// 2b. GET PAYMENT CATEGORIES
+app.get('/api/payments/categories', (req, res) => {
+  res.json({ categories: Payment.EXPENSE_CATEGORIES });
+});
+
 // 3. CREATE PAYMENT (Google Drive Upload)
 app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
   try {
-    const { date, category, paymentSource, paymentMethod, amount, description, isBuilderPayment } = req.body;
+    const { date, category, paymentSource, expenseCategory, paymentMethod, amount, description, isBuilderPayment } = req.body;
 
     const sourceVal = paymentSource || category;
     if (!amount || !description || !sourceVal || !paymentMethod) {
@@ -481,6 +511,8 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
     }
 
     const normalizedSource = (sourceVal === 'Loan Cash' || sourceVal === 'Home Loan') ? 'Home Loan' : 'Own Cash';
+    const isBuilder = expenseCategory === 'Builder / Contractor' || isBuilderPayment === 'true' || isBuilderPayment === true;
+    const resolvedExpenseCategory = expenseCategory || (isBuilder ? 'Builder / Contractor' : 'Others');
 
     let proofFileId = '';
     let proofUrl = '';
@@ -507,6 +539,7 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
     const newPayment = await Payment.create({
       date: date ? new Date(date) : new Date(),
       paymentSource: normalizedSource,
+      expenseCategory: resolvedExpenseCategory,
       category: normalizedSource,
       paymentMethod,
       amount: parseFloat(amount),
@@ -514,7 +547,7 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
       proofImage: proofUrl, // keep in sync for seamless backward compatibility
       proofFileId,
       proofUrl,
-      isBuilderPayment: isBuilderPayment === 'true' || isBuilderPayment === true
+      isBuilderPayment: isBuilder
     });
 
     res.status(201).json(newPayment);
@@ -545,14 +578,27 @@ app.put('/api/payments/:id', upload.single('proofImage'), async (req, res) => {
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    const { date, category, paymentSource, paymentMethod, amount, description, isBuilderPayment } = req.body;
+    const { date, category, paymentSource, expenseCategory, paymentMethod, amount, description, isBuilderPayment } = req.body;
 
     if (amount !== undefined) payment.amount = parseFloat(amount);
     if (description !== undefined) payment.description = description.trim();
     if (date !== undefined) payment.date = new Date(date);
     if (paymentMethod !== undefined) payment.paymentMethod = paymentMethod;
+
+    if (expenseCategory !== undefined) {
+      payment.expenseCategory = expenseCategory;
+      if (expenseCategory === 'Builder / Contractor') {
+        payment.isBuilderPayment = true;
+      } else if (isBuilderPayment === undefined) {
+        payment.isBuilderPayment = false;
+      }
+    }
+
     if (isBuilderPayment !== undefined) {
       payment.isBuilderPayment = isBuilderPayment === 'true' || isBuilderPayment === true;
+      if (payment.isBuilderPayment && (!payment.expenseCategory || payment.expenseCategory === 'Others')) {
+        payment.expenseCategory = 'Builder / Contractor';
+      }
     }
 
     const sourceVal = paymentSource || category;

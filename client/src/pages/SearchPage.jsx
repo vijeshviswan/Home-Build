@@ -2,31 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { Search as SearchIcon, X, Calendar, Filter, FileText } from 'lucide-react';
 import PaymentCard from '../components/PaymentCard';
 import { formatCurrency } from '../utils/formatters';
+import { EXPENSE_CATEGORIES } from '../utils/categories';
 
 export default function SearchPage({ payments, onSelectPayment }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [sourceFilter, setSourceFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
 
   // Client-side filtering for instantaneous mobile responsiveness
   const filteredPayments = payments.filter((payment) => {
-    // 1. Payment source / Category filter
-    const src = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category);
-    if (categoryFilter !== 'All' && src !== categoryFilter) {
+    // 1. Expense Category filter
+    const cat = payment.expenseCategory || (payment.isBuilderPayment ? 'Builder / Contractor' : 'Others');
+    if (categoryFilter !== 'All' && cat !== categoryFilter) {
       return false;
     }
 
-    // 2. Search query in description
+    // 2. Payment Source filter
+    const src = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category) || 'Own Cash';
+    if (sourceFilter !== 'All' && src !== sourceFilter) {
+      return false;
+    }
+
+    // 3. Search query in description or method
     if (searchTerm.trim() !== '') {
       const query = searchTerm.toLowerCase();
       const descMatch = (payment.description || '').toLowerCase().includes(query);
       const methodMatch = (payment.paymentMethod || '').toLowerCase().includes(query);
-      if (!descMatch && !methodMatch) {
+      const catMatch = cat.toLowerCase().includes(query);
+      if (!descMatch && !methodMatch && !catMatch) {
         return false;
       }
     }
 
-    // 3. Date filter
+    // 4. Date filter
     if (dateFilter) {
       const pDate = new Date(payment.date);
       const selDate = new Date(dateFilter);
@@ -55,7 +64,7 @@ export default function SearchPage({ payments, onSelectPayment }) {
           <input
             type="text"
             className="search-input"
-            placeholder="Search payments by description..."
+            placeholder="Search by description or category..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             id="search-input-box"
@@ -71,11 +80,11 @@ export default function SearchPage({ payments, onSelectPayment }) {
           )}
         </div>
 
-        {/* FILTERS ROW */}
-        <div className="filter-row">
+        {/* FILTERS ROW 1: CATEGORY & SOURCE */}
+        <div className="filter-row" style={{ marginBottom: '8px' }}>
           <div>
             <label className="form-label" style={{ fontSize: '0.78rem' }}>
-              Payment Source
+              Expense Category
             </label>
             <select
               className="form-select"
@@ -84,24 +93,45 @@ export default function SearchPage({ payments, onSelectPayment }) {
               onChange={(e) => setCategoryFilter(e.target.value)}
               id="filter-category"
             >
+              <option value="All">All Categories</option>
+              {EXPENSE_CATEGORIES.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem' }}>
+              Payment Source
+            </label>
+            <select
+              className="form-select"
+              style={{ padding: '10px 12px' }}
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              id="filter-source"
+            >
               <option value="All">All Sources</option>
               <option value="Own Cash">Own Cash</option>
               <option value="Home Loan">Home Loan</option>
             </select>
           </div>
+        </div>
 
-          <div>
+        {/* FILTERS ROW 2: DATE */}
+        <div className="filter-row">
+          <div style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label className="form-label" style={{ fontSize: '0.78rem' }}>
-                Date
+                Filter by Date
               </label>
               {dateFilter && (
                 <button
                   type="button"
                   onClick={() => setDateFilter('')}
-                  style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.72rem', cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  Clear
+                  Clear Date
                 </button>
               )}
             </div>
