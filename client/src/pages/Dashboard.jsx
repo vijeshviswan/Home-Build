@@ -7,7 +7,9 @@ export default function Dashboard({
   dashboardData,
   builderData,
   totalCashReceived = 0,
-  payments = []
+  payments = [],
+  onOpenOwnCashModal,
+  onOpenHomeLoanModal
 }) {
   // Extract or compute dynamic fund source balances
   const fundSources = dashboardData?.fundSources;
@@ -16,22 +18,27 @@ export default function Dashboard({
 
   // Own Cash calculations
   const ownCashInitial = ownCashData?.initialBalance ?? 130000;
+  const ownCashTotalAdded = ownCashData?.totalAdded ?? (ownCashInitial + (ownCashData?.additionalFunds || 0));
   const ownCashSpent = ownCashData?.totalSpent ?? payments
     .filter(p => (p.paymentSource === 'Own Cash' || p.category === 'Own Cash'))
     .reduce((sum, p) => sum + (p.amount || 0), 0);
-  const ownCashRemaining = ownCashData?.remainingBalance ?? (ownCashInitial - ownCashSpent);
-  const ownCashPercentRemaining = ownCashInitial > 0 
-    ? Math.max(0, Math.min(100, Math.round((ownCashRemaining / ownCashInitial) * 100))) 
+  const ownCashRemaining = ownCashData?.remainingBalance ?? (ownCashTotalAdded - ownCashSpent);
+  const ownCashPercentRemaining = ownCashTotalAdded > 0 
+    ? Math.max(0, Math.min(100, Math.round((ownCashRemaining / ownCashTotalAdded) * 100))) 
     : 0;
 
   // Home Loan calculations
-  const homeLoanInitial = homeLoanData?.initialBalance ?? (dashboardData?.homeLoan?.totalHomeLoan || 3000000);
+  const homeLoanSanctioned = homeLoanData?.sanctionedAmount ?? (dashboardData?.homeLoan?.totalHomeLoan || 0);
+  const homeLoanDisbursed = homeLoanData?.totalDisbursed ?? (dashboardData?.homeLoan?.totalDisbursed || 0);
   const homeLoanSpent = homeLoanData?.totalSpent ?? payments
     .filter(p => (p.paymentSource === 'Home Loan' || p.category === 'Home Loan' || p.category === 'Loan Cash'))
     .reduce((sum, p) => sum + (p.amount || 0), 0);
-  const homeLoanRemaining = homeLoanData?.remainingBalance ?? (homeLoanInitial - homeLoanSpent);
-  const homeLoanPercentRemaining = homeLoanInitial > 0 
-    ? Math.max(0, Math.min(100, Math.round((homeLoanRemaining / homeLoanInitial) * 100))) 
+  
+  // Effective base for Home Loan
+  const homeLoanBase = homeLoanDisbursed > 0 ? homeLoanDisbursed : (homeLoanSanctioned > 0 ? homeLoanSanctioned : 0);
+  const homeLoanRemaining = homeLoanData?.remainingBalance ?? Math.max(0, homeLoanBase - homeLoanSpent);
+  const homeLoanPercentRemaining = homeLoanBase > 0 
+    ? Math.max(0, Math.min(100, Math.round((homeLoanRemaining / homeLoanBase) * 100))) 
     : 0;
 
   // Total Construction Spent
@@ -98,10 +105,11 @@ export default function Dashboard({
           {/* OWN CASH CARD */}
           <div 
             className="fund-balance-card fund-balance-card-own"
-            onClick={() => onNavigate('total-cost')}
+            onClick={onOpenOwnCashModal}
             id="card-own-cash-balance"
             role="button"
             tabIndex={0}
+            title="Click to view details & add funds"
           >
             <div className="fund-card-top">
               <div className="fund-icon-title">
@@ -133,8 +141,8 @@ export default function Dashboard({
 
             <div className="fund-split-row">
               <div className="fund-split-col">
-                <span className="fund-split-label">Starting</span>
-                <span className="fund-split-val">{formatCurrency(ownCashInitial)}</span>
+                <span className="fund-split-label">Total Added</span>
+                <span className="fund-split-val">{formatCurrency(ownCashTotalAdded)}</span>
               </div>
               <div className="fund-split-col" style={{ textAlign: 'right' }}>
                 <span className="fund-split-label">Spent</span>
@@ -143,15 +151,20 @@ export default function Dashboard({
                 </span>
               </div>
             </div>
+
+            <div className="source-balance-hint">
+              Tap to view details & add funds →
+            </div>
           </div>
 
           {/* HOME LOAN CARD */}
           <div 
             className="fund-balance-card fund-balance-card-loan"
-            onClick={() => onNavigate('home-loan')}
+            onClick={onOpenHomeLoanModal}
             id="card-home-loan-balance"
             role="button"
             tabIndex={0}
+            title="Click to view stages & add installments"
           >
             <div className="fund-card-top">
               <div className="fund-icon-title">
@@ -161,12 +174,16 @@ export default function Dashboard({
                 <span className="fund-card-name">Home Loan</span>
               </div>
               <span className="fund-badge">
-                {homeLoanPercentRemaining}% Left
+                {homeLoanDisbursed > 0 
+                  ? `${homeLoanData?.installmentsCount || 1} Stages` 
+                  : (homeLoanSanctioned > 0 ? `${homeLoanPercentRemaining}% Left` : 'Setup Loan')}
               </span>
             </div>
 
             <div className="fund-remaining-block">
-              <div className="fund-remaining-label">Remaining Balance</div>
+              <div className="fund-remaining-label">
+                {homeLoanDisbursed > 0 ? 'Available Disbursed Cash' : 'Remaining Balance'}
+              </div>
               <div className="fund-remaining-num">
                 {formatCurrency(homeLoanRemaining)}
               </div>
@@ -183,8 +200,12 @@ export default function Dashboard({
 
             <div className="fund-split-row">
               <div className="fund-split-col">
-                <span className="fund-split-label">Starting</span>
-                <span className="fund-split-val">{formatCurrency(homeLoanInitial)}</span>
+                <span className="fund-split-label">
+                  {homeLoanDisbursed > 0 ? 'Disbursed' : 'Sanctioned'}
+                </span>
+                <span className="fund-split-val">
+                  {formatCurrency(homeLoanDisbursed > 0 ? homeLoanDisbursed : homeLoanSanctioned)}
+                </span>
               </div>
               <div className="fund-split-col" style={{ textAlign: 'right' }}>
                 <span className="fund-split-label">Spent</span>
@@ -192,6 +213,10 @@ export default function Dashboard({
                   {formatCurrency(homeLoanSpent)}
                 </span>
               </div>
+            </div>
+
+            <div className="source-balance-hint">
+              Tap to view stages & add installment →
             </div>
           </div>
         </div>
@@ -223,7 +248,7 @@ export default function Dashboard({
         {/* TILE 2: HOME LOAN (Purple) */}
         <button
           className="menu-tile menu-tile-purple"
-          onClick={() => onNavigate('home-loan')}
+          onClick={onOpenHomeLoanModal}
           id="tile-home-loan"
           aria-label="Home Loan"
         >
@@ -237,7 +262,11 @@ export default function Dashboard({
             <span className="tile-primary-value">{formatCurrency(homeLoanRemaining)}</span>
           </div>
           <div className="tile-bottom-row">
-            <span className="tile-bottom-subtext">Sanctioned & disbursed</span>
+            <span className="tile-bottom-subtext">
+              {homeLoanDisbursed > 0 
+                ? `${formatCurrency(homeLoanDisbursed)} disbursed across stages`
+                : 'Sanctioned & disbursed stages'}
+            </span>
           </div>
         </button>
 

@@ -2355,6 +2355,442 @@ body {
 }
 
 /* =========================================
+   OWN CASH & HOME LOAN MODAL STYLES
+========================================= */
+.own-cash-hero-card {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%);
+  border-radius: 20px;
+  padding: 18px 20px;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.2);
+  margin-bottom: 14px;
+}
+
+.home-loan-hero-card {
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 60%, #5b21b6 100%);
+  border-radius: 20px;
+  padding: 18px 20px;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.2);
+  margin-bottom: 14px;
+}
+
+.hero-top-badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.hero-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.loan-badge-pill {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.hero-balance-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.88;
+  font-weight: 600;
+}
+
+.hero-balance-value {
+  font-size: 1.85rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum";
+  margin: 4px 0 10px;
+}
+
+.hero-progress-track {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.hero-progress-fill {
+  height: 100%;
+  background: #34d399;
+  border-radius: 9999px;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-progress-fill-loan {
+  background: #a78bfa;
+}
+
+.own-cash-stats-grid,
+.home-loan-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.own-stat-box,
+.loan-stat-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.stat-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.stat-box-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-icon-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-inflow {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.icon-outflow {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.stat-box-number {
+  font-size: 1.15rem;
+  font-weight: 850;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  font-feature-settings: "tnum";
+}
+
+.stat-box-breakdown {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.sanctioned-strip-card {
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.sanctioned-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.sanctioned-percent-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.sanctioned-progress-track {
+  height: 6px;
+  background: #e9d5ff;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.sanctioned-progress-fill {
+  height: 100%;
+  background: #7c3aed;
+  border-radius: 9999px;
+  transition: width 0.35s ease;
+}
+
+.sanctioned-strip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.fund-form-card {
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.loan-form-card {
+  background: #fdf4ff;
+  border-color: #d8b4fe;
+}
+
+.fund-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.quick-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-chip-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-chip-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.quick-source-chip {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 4px 9px;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-source-chip.active {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
+
+.quick-source-chip.active-loan {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+  color: #6d28d9;
+}
+
+.starting-balance-edit-box {
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.text-link-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.text-link-btn:hover {
+  text-decoration: underline;
+}
+
+.modal-pill-tabs {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.pill-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.pill-tab-btn.active {
+  background: #ffffff;
+  color: #059669;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.pill-tab-btn.active.active-loan {
+  color: #7c3aed;
+}
+
+.fund-list-container {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.fund-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: background 0.15s ease;
+}
+
+.starting-fund-item {
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.fund-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fund-item-icon-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fund-item-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fund-item-meta {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.fund-item-amount {
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+}
+
+.fund-item-amount.positive {
+  color: #059669;
+}
+
+.fund-item-amount.negative {
+  color: #e11d48;
+}
+
+.stage-number-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #f5f3ff;
+  color: #7c3aed;
+  font-size: 0.76rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tag-mini-builder {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #fff7ed;
+  color: #ea580c;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 5px;
+}
+
+.delete-item-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.delete-item-btn:hover {
+  color: #e11d48;
+  background: #ffe4e6;
+}
+
+.empty-state-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  text-align: center;
+  gap: 6px;
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px dashed #cbd5e1;
+}
+
+/* =========================================
    MEDIA PRINT RULES (Clean paper output)
 ========================================= */
 @media print {

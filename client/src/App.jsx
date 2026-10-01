@@ -11,6 +11,8 @@ import SearchPage from './pages/SearchPage';
 import BuilderPage from './pages/BuilderPage';
 import PaymentDetailsModal from './components/PaymentDetailsModal';
 import SettingsModal from './components/SettingsModal';
+import OwnCashModal from './components/OwnCashModal';
+import HomeLoanModal from './components/HomeLoanModal';
 import PinScreen from './components/PinScreen';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -23,11 +25,15 @@ export default function App() {
   const [settings, setSettings] = useState(null);
   const [cashSources, setCashSources] = useState([]);
   const [totalCashReceived, setTotalCashReceived] = useState(0);
+  const [fundAdditions, setFundAdditions] = useState([]);
+  const [loanInstallments, setLoanInstallments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals & Navigation state
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isOwnCashModalOpen, setIsOwnCashModalOpen] = useState(false);
+  const [isHomeLoanModalOpen, setIsHomeLoanModalOpen] = useState(false);
   const [defaultIsBuilderForNew, setDefaultIsBuilderForNew] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -40,12 +46,14 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     try {
-      const [dashRes, paymentsRes, builderRes, settingsRes, cashRes] = await Promise.all([
+      const [dashRes, paymentsRes, builderRes, settingsRes, cashRes, fundAddRes, loanInstRes] = await Promise.all([
         fetch('/api/dashboard'),
         fetch('/api/payments'),
         fetch('/api/builder'),
         fetch('/api/settings'),
-        fetch('/api/cash-sources')
+        fetch('/api/cash-sources'),
+        fetch('/api/fund-additions'),
+        fetch('/api/loan-installments')
       ]);
 
       if (dashRes.ok) {
@@ -68,6 +76,14 @@ export default function App() {
         const cData = await cashRes.json();
         setCashSources(cData.cashSources || []);
         setTotalCashReceived(cData.totalCashReceived || 0);
+      }
+      if (fundAddRes.ok) {
+        const fData = await fundAddRes.json();
+        setFundAdditions(fData.additions || []);
+      }
+      if (loanInstRes.ok) {
+        const lData = await loanInstRes.json();
+        setLoanInstallments(lData.installments || []);
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -185,6 +201,82 @@ export default function App() {
     showToast('Settings updated successfully');
   };
 
+  const handleAddFundAddition = async (entryData) => {
+    const res = await fetch('/api/fund-additions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entryData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add fund');
+    }
+    await loadData();
+    showToast('Fund added to Own Cash successfully!');
+  };
+
+  const handleDeleteFundAddition = async (id) => {
+    const res = await fetch(`/api/fund-additions/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete fund entry');
+    }
+    await loadData();
+    showToast('Fund entry deleted');
+  };
+
+  const handleUpdateOwnCashInitial = async (newVal) => {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ownCashInitialBalance: newVal })
+    });
+    if (!res.ok) {
+      throw new Error('Failed to update starting balance');
+    }
+    await loadData();
+    showToast('Starting balance updated');
+  };
+
+  const handleAddLoanInstallment = async (entryData) => {
+    const res = await fetch('/api/loan-installments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entryData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add loan installment');
+    }
+    await loadData();
+    showToast('Loan installment saved successfully!');
+  };
+
+  const handleDeleteLoanInstallment = async (id) => {
+    const res = await fetch(`/api/loan-installments/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete loan installment');
+    }
+    await loadData();
+    showToast('Loan installment deleted');
+  };
+
+  const handleUpdateSanctionedLoan = async (newVal) => {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ totalHomeLoan: newVal, homeLoanInitialBalance: newVal })
+    });
+    if (!res.ok) {
+      throw new Error('Failed to update sanctioned limit');
+    }
+    await loadData();
+    showToast('Sanctioned loan limit updated');
+  };
+
   // Header Titles
   const getHeaderInfo = () => {
     switch (activeTab) {
@@ -280,6 +372,8 @@ export default function App() {
             builderData={builderData}
             totalCashReceived={totalCashReceived}
             payments={payments}
+            onOpenOwnCashModal={() => setIsOwnCashModalOpen(true)}
+            onOpenHomeLoanModal={() => setIsHomeLoanModalOpen(true)}
           />
         )}
 
@@ -300,6 +394,9 @@ export default function App() {
             onSelectPayment={setSelectedPayment}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onNavigateNewPayment={() => handleTabChange('new-payment')}
+            loanInstallments={loanInstallments}
+            onAddLoanInstallment={handleAddLoanInstallment}
+            onDeleteLoanInstallment={handleDeleteLoanInstallment}
           />
         )}
 
@@ -361,6 +458,32 @@ export default function App() {
           onUpdate={handleUpdatePayment}
         />
       )}
+
+      {/* DEDICATED OWN CASH DETAILS MODAL */}
+      <OwnCashModal
+        isOpen={isOwnCashModalOpen}
+        onClose={() => setIsOwnCashModalOpen(false)}
+        dashboardData={dashboardData}
+        payments={payments}
+        fundAdditions={fundAdditions}
+        onAddFundAddition={handleAddFundAddition}
+        onDeleteFundAddition={handleDeleteFundAddition}
+        onUpdateInitialBalance={handleUpdateOwnCashInitial}
+        onSelectPayment={setSelectedPayment}
+      />
+
+      {/* DEDICATED HOME LOAN DETAILS MODAL */}
+      <HomeLoanModal
+        isOpen={isHomeLoanModalOpen}
+        onClose={() => setIsHomeLoanModalOpen(false)}
+        dashboardData={dashboardData}
+        payments={payments}
+        loanInstallments={loanInstallments}
+        onAddLoanInstallment={handleAddLoanInstallment}
+        onDeleteLoanInstallment={handleDeleteLoanInstallment}
+        onUpdateSanctionedAmount={handleUpdateSanctionedLoan}
+        onSelectPayment={setSelectedPayment}
+      />
 
       <SettingsModal
         isOpen={isSettingsOpen}

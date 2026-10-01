@@ -8,25 +8,36 @@ export default function LoanPage({
   payments, 
   onSelectPayment, 
   onOpenSettings,
-  onNavigateNewPayment
+  onNavigateNewPayment,
+  loanInstallments = [],
+  onAddLoanInstallment,
+  onDeleteLoanInstallment
 }) {
   const homeLoan = dashboardData?.homeLoan || {
     totalHomeLoan: 3000000,
-    loanCashReceived: 1200000,
-    loanBalance: 1800000,
+    loanCashReceived: 0,
+    loanBalance: 3000000,
     initialBalance: 3000000
   };
 
-  const initialSanctioned = homeLoan.initialBalance || homeLoan.totalHomeLoan || 3000000;
+  const initialSanctioned = homeLoan.sanctionedAmount || homeLoan.totalHomeLoan || 3000000;
 
   // Filter payments financed via Home Loan
   const loanPayments = payments.filter(
     p => p.paymentSource === 'Home Loan' || p.category === 'Home Loan' || p.category === 'Loan Cash'
   );
   const totalLoanSpent = loanPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-  const loanRemainingBalance = dashboardData?.fundSources?.homeLoan?.remainingBalance ?? Math.max(0, initialSanctioned - totalLoanSpent);
-  const percentRemaining = initialSanctioned > 0 
-    ? Math.max(0, Math.min(100, Math.round((loanRemainingBalance / initialSanctioned) * 100))) 
+
+  // Total Disbursed from installments
+  const totalDisbursedFromInst = loanInstallments.reduce((sum, i) => sum + (i.amount || 0), 0);
+  const totalDisbursed = totalDisbursedFromInst > 0 
+    ? totalDisbursedFromInst 
+    : (dashboardData?.fundSources?.homeLoan?.totalDisbursed || homeLoan.loanCashReceived || 0);
+
+  // Available cash in bank account
+  const loanRemainingBalance = Math.max(0, totalDisbursed - totalLoanSpent);
+  const percentRemaining = totalDisbursed > 0 
+    ? Math.max(0, Math.min(100, Math.round((loanRemainingBalance / totalDisbursed) * 100))) 
     : 0;
 
   return (
@@ -69,31 +80,65 @@ export default function LoanPage({
           </div>
         </div>
 
-        <div className="tile-stat-grid">
+        <div className="tile-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
           <div className="tile-stat-item">
-            <span className="tile-stat-label">Sanctioned Amount</span>
-            <span className="tile-stat-value">
+            <span className="tile-stat-label">Sanctioned</span>
+            <span className="tile-stat-value" style={{ fontSize: '0.95rem' }}>
               {formatCurrency(initialSanctioned)}
             </span>
           </div>
           <div className="tile-stat-item">
-            <span className="tile-stat-label">Total Loan Spent</span>
-            <span className="tile-stat-value" style={{ color: '#ef4444' }}>
+            <span className="tile-stat-label">Disbursed</span>
+            <span className="tile-stat-value" style={{ fontSize: '0.95rem', color: '#7c3aed' }}>
+              {formatCurrency(totalDisbursed)}
+            </span>
+          </div>
+          <div className="tile-stat-item">
+            <span className="tile-stat-label">Spent</span>
+            <span className="tile-stat-value" style={{ fontSize: '0.95rem', color: '#ef4444' }}>
               {formatCurrency(totalLoanSpent)}
             </span>
           </div>
         </div>
       </div>
 
-      {/* LOAN DISBURSED CASH INFO */}
-      <div className="summary-counter-card">
-        <span className="summary-counter-label">
-          Loan Cash Disbursed to Bank:
-        </span>
-        <span className="summary-counter-amount" style={{ color: '#10b981' }}>
-          {formatCurrency(homeLoan.loanCashReceived)}
+      {/* DISBURSED STAGES BREAKDOWN */}
+      <div className="section-header" style={{ marginTop: '16px' }}>
+        <span className="section-title">Bank Installments / Stages</span>
+        <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+          {loanInstallments.length} {loanInstallments.length === 1 ? 'stage' : 'stages'}
         </span>
       </div>
+
+      {loanInstallments.length === 0 ? (
+        <div className="summary-counter-card" style={{ marginBottom: '16px' }}>
+          <span className="summary-counter-label">Total Disbursed so far:</span>
+          <span className="summary-counter-amount" style={{ color: '#7c3aed' }}>
+            {formatCurrency(totalDisbursed)}
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+          {loanInstallments.map((inst, idx) => (
+            <div key={inst._id} className="fund-history-item stage-history-item">
+              <div className="fund-item-left">
+                <div className="stage-number-badge">{idx + 1}</div>
+                <div>
+                  <div className="fund-item-title">{inst.stage}</div>
+                  <div className="fund-item-meta">
+                    {formatDate(inst.disbursementDate)}
+                    {inst.bankName ? ` • ${inst.bankName}` : ''}
+                    {inst.referenceNumber ? ` (${inst.referenceNumber})` : ''}
+                  </div>
+                </div>
+              </div>
+              <div className="fund-item-amount positive" style={{ color: '#7c3aed' }}>
+                +{formatCurrency(inst.amount)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* LOAN PAYMENTS LIST */}
       <div className="section-header">

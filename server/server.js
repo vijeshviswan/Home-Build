@@ -12,6 +12,8 @@ const Payment = require('./models/Payment');
 const ProjectSettings = require('./models/ProjectSettings');
 const CashSource = require('./models/CashSource');
 const FundSource = require('./models/FundSource');
+const FundAddition = require('./models/FundAddition');
+const LoanInstallment = require('./models/LoanInstallment');
 const { uploadImageToDrive, deleteFileFromDrive } = require('./services/googleDriveService');
 const { generateAuthUrl, exchangeCodeForTokens, isOAuthReady } = require('./services/googleOAuthService');
 
@@ -322,11 +324,30 @@ app.get('/api/dashboard', async (req, res) => {
 
     const totalAmountPaid = ownCashSpent + homeLoanSpent;
 
-    const ownCashInitial = fundSourcesDocs.ownCash.initialBalance || 0;
-    const homeLoanInitial = fundSourcesDocs.homeLoan.initialBalance || 0;
+    // Additional Own Cash additions
+    const ownCashAdditionsAgg = await FundAddition.aggregate([
+      { $match: { fundSource: 'Own Cash' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]);
+    const ownCashAddedFunds = ownCashAdditionsAgg.length > 0 ? ownCashAdditionsAgg[0].total : 0;
+    const ownCashAdditionsCount = ownCashAdditionsAgg.length > 0 ? ownCashAdditionsAgg[0].count : 0;
 
-    const ownCashRemaining = ownCashInitial - ownCashSpent;
-    const homeLoanRemaining = homeLoanInitial - homeLoanSpent;
+    const ownCashInitial = fundSourcesDocs.ownCash.initialBalance || 0;
+    const ownCashTotalAdded = ownCashInitial + ownCashAddedFunds;
+    const ownCashRemaining = ownCashTotalAdded - ownCashSpent;
+
+    // Loan Installments (Stage-by-stage Disbursements)
+    const loanInstallmentsAgg = await LoanInstallment.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]);
+    const totalLoanDisbursed = loanInstallmentsAgg.length > 0 
+      ? loanInstallmentsAgg[0].total 
+      : (settings.loanCashReceived || 0);
+    const loanInstallmentsCount = loanInstallmentsAgg.length > 0 ? loanInstallmentsAgg[0].count : 0;
+
+    const totalHomeLoan = settings.totalHomeLoan || 0;
+    const homeLoanRemaining = totalLoanDisbursed - homeLoanSpent;
+    const undisbursedAmount = Math.max(0, totalHomeLoan - totalLoanDisbursed);
 
     // Builder Payments
     const builderPaymentsResult = await Payment.aggregate([
@@ -338,11 +359,6 @@ app.get('/api/dashboard', async (req, res) => {
     const builderContract = settings.builderContractAmount || 0;
     const builderBalance = Math.max(0, builderContract - builderPaid);
     const builderExtraPaid = Math.max(0, builderPaid - builderContract);
-
-    // Home Loan calculation
-    const totalHomeLoan = settings.totalHomeLoan || 0;
-    const loanCashReceived = settings.loanCashReceived || 0;
-    const loanBalance = Math.max(0, totalHomeLoan - loanCashReceived);
 
     // Recent payments (last 5)
     const recentPayments = await Payment.find()
@@ -357,26 +373,37 @@ app.get('/api/dashboard', async (req, res) => {
         ownCash: {
           name: 'Own Cash',
           initialBalance: ownCashInitial,
+          additionalFunds: ownCashAddedFunds,
+          totalAdded: ownCashTotalAdded,
           totalSpent: ownCashSpent,
-          remainingBalance: ownCashRemaining
+          remainingBalance: ownCashRemaining,
+          additionsCount: ownCashAdditionsCount
         },
         homeLoan: {
           name: 'Home Loan',
-          initialBalance: homeLoanInitial,
+          sanctionedAmount: totalHomeLoan,
+          totalDisbursed: totalLoanDisbursed,
+          initialBalance: totalLoanDisbursed > 0 ? totalLoanDisbursed : (fundSourcesDocs.homeLoan.initialBalance || totalHomeLoan),
           totalSpent: homeLoanSpent,
-          remainingBalance: homeLoanRemaining
+          remainingBalance: homeLoanRemaining,
+          undisbursedAmount,
+          installmentsCount: loanInstallmentsCount
         },
-        totalInitial: ownCashInitial + homeLoanInitial,
+        totalInitial: ownCashTotalAdded + totalLoanDisbursed,
         totalSpent: totalAmountPaid,
         totalRemaining: ownCashRemaining + homeLoanRemaining
       },
       homeLoan: {
         totalHomeLoan,
-        loanCashReceived,
-        loanBalance,
-        initialBalance: homeLoanInitial,
+        sanctionedAmount: totalHomeLoan,
+        totalDisbursed: totalLoanDisbursed,
+        loanCashReceived: totalLoanDisbursed,
+        loanBalance: undisbursedAmount,
+        undisbursedAmount,
+        initialBalance: totalLoanDisbursed > 0 ? totalLoanDisbursed : (fundSourcesDocs.homeLoan.initialBalance || totalHomeLoan),
         totalSpent: homeLoanSpent,
-        remainingBalance: homeLoanRemaining
+        remainingBalance: homeLoanRemaining,
+        installmentsCount: loanInstallmentsCount
       },
       builder: {
         builderName: settings.builderName,
@@ -698,33 +725,52 @@ app.get('/api/fund-sources', async (req, res) => {
     ]);
     const homeLoanSpent = homeLoanPayments.length > 0 ? homeLoanPayments[0].total : 0;
 
+    // Additional Own Cash additions
+    const ownCashAdditionsAgg = await FundAddition.aggregate([
+      { $match: { fundSource: 'Own Cash' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]);
+    const ownCashAddedFunds = ownCashAdditionsAgg.length > 0 ? ownCashAdditionsAgg[0].total : 0;
     const ownCashInitial = fundSourcesDocs.ownCash.initialBalance || 0;
-    const homeLoanInitial = fundSourcesDocs.homeLoan.initialBalance || 0;
+    const ownCashTotalAdded = ownCashInitial + ownCashAddedFunds;
+
+    // Loan Installments
+    const loanInstallmentsAgg = await LoanInstallment.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]);
+    const totalLoanDisbursed = loanInstallmentsAgg.length > 0 
+      ? loanInstallmentsAgg[0].total 
+      : (settings.loanCashReceived || 0);
 
     const sources = [
       {
         _id: fundSourcesDocs.ownCash._id,
         name: 'Own Cash',
         initialBalance: ownCashInitial,
+        additionalFunds: ownCashAddedFunds,
+        totalAdded: ownCashTotalAdded,
         totalSpent: ownCashSpent,
-        remainingBalance: ownCashInitial - ownCashSpent,
+        remainingBalance: ownCashTotalAdded - ownCashSpent,
         description: fundSourcesDocs.ownCash.description
       },
       {
         _id: fundSourcesDocs.homeLoan._id,
         name: 'Home Loan',
-        initialBalance: homeLoanInitial,
+        initialBalance: totalLoanDisbursed > 0 ? totalLoanDisbursed : (fundSourcesDocs.homeLoan.initialBalance || settings.totalHomeLoan || 0),
+        sanctionedAmount: settings.totalHomeLoan || 0,
+        totalDisbursed: totalLoanDisbursed,
         totalSpent: homeLoanSpent,
-        remainingBalance: homeLoanInitial - homeLoanSpent,
+        remainingBalance: totalLoanDisbursed - homeLoanSpent,
+        undisbursedAmount: Math.max(0, (settings.totalHomeLoan || 0) - totalLoanDisbursed),
         description: fundSourcesDocs.homeLoan.description
       }
     ];
 
     res.json({
       sources,
-      totalInitial: ownCashInitial + homeLoanInitial,
+      totalInitial: ownCashTotalAdded + totalLoanDisbursed,
       totalSpent: ownCashSpent + homeLoanSpent,
-      totalRemaining: (ownCashInitial - ownCashSpent) + (homeLoanInitial - homeLoanSpent)
+      totalRemaining: (ownCashTotalAdded - ownCashSpent) + (totalLoanDisbursed - homeLoanSpent)
     });
   } catch (error) {
     console.error('Error fetching fund sources:', error);
@@ -802,6 +848,147 @@ app.delete('/api/cash-sources/:id', async (req, res) => {
     res.json({ message: 'Cash source deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete cash source' });
+  }
+});
+
+// 10. FUND ADDITIONS (OWN CASH FUNDS)
+app.get('/api/fund-additions', async (req, res) => {
+  try {
+    const { fundSource = 'Own Cash' } = req.query;
+    const additions = await FundAddition.find({ fundSource }).sort({ date: -1, createdAt: -1 });
+    const totalAdded = additions.reduce((sum, item) => sum + (item.amount || 0), 0);
+    res.json({ additions, totalAdded });
+  } catch (error) {
+    console.error('Error fetching fund additions:', error);
+    res.status(500).json({ error: 'Failed to fetch fund additions' });
+  }
+});
+
+app.post('/api/fund-additions', async (req, res) => {
+  try {
+    const { amount, date, sourceName, description, fundSource = 'Own Cash' } = req.body;
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Please enter a valid fund amount greater than zero' });
+    }
+    const newAddition = await FundAddition.create({
+      fundSource,
+      amount: parseFloat(amount),
+      date: date ? new Date(date) : new Date(),
+      sourceName: sourceName ? sourceName.trim() : 'Personal Savings',
+      description: description ? description.trim() : ''
+    });
+    res.status(201).json(newAddition);
+  } catch (error) {
+    console.error('Error adding fund:', error);
+    res.status(500).json({ error: error.message || 'Failed to add fund' });
+  }
+});
+
+app.delete('/api/fund-additions/:id', async (req, res) => {
+  try {
+    const item = await FundAddition.findByIdAndDelete(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Fund addition not found' });
+    }
+    res.json({ message: 'Fund addition deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting fund addition:', error);
+    res.status(500).json({ error: 'Failed to delete fund addition' });
+  }
+});
+
+// 11. LOAN INSTALLMENTS (STAGE-BY-STAGE DISBURSEMENTS)
+app.get('/api/loan-installments', async (req, res) => {
+  try {
+    const installments = await LoanInstallment.find().sort({ disbursementDate: 1, createdAt: 1 });
+    const totalDisbursed = installments.reduce((sum, item) => sum + (item.amount || 0), 0);
+    res.json({ installments, totalDisbursed });
+  } catch (error) {
+    console.error('Error fetching loan installments:', error);
+    res.status(500).json({ error: 'Failed to fetch loan installments' });
+  }
+});
+
+app.post('/api/loan-installments', async (req, res) => {
+  try {
+    const { stage, amount, disbursementDate, description, referenceNumber, bankName } = req.body;
+    if (!stage || !stage.trim()) {
+      return res.status(400).json({ error: 'Stage/installment name is required' });
+    }
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Please enter a valid disbursement amount greater than zero' });
+    }
+    const newInstallment = await LoanInstallment.create({
+      stage: stage.trim(),
+      amount: parseFloat(amount),
+      disbursementDate: disbursementDate ? new Date(disbursementDate) : new Date(),
+      description: description ? description.trim() : '',
+      referenceNumber: referenceNumber ? referenceNumber.trim() : '',
+      bankName: bankName ? bankName.trim() : ''
+    });
+
+    // Update settings.loanCashReceived with total disbursed
+    const allInstallments = await LoanInstallment.find();
+    const totalDisbursed = allInstallments.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const settings = await getOrCreateSettings();
+    settings.loanCashReceived = totalDisbursed;
+    await settings.save();
+
+    res.status(201).json(newInstallment);
+  } catch (error) {
+    console.error('Error adding loan installment:', error);
+    res.status(500).json({ error: error.message || 'Failed to add loan installment' });
+  }
+});
+
+app.put('/api/loan-installments/:id', async (req, res) => {
+  try {
+    const { stage, amount, disbursementDate, description, referenceNumber, bankName } = req.body;
+    const installment = await LoanInstallment.findById(req.params.id);
+    if (!installment) {
+      return res.status(404).json({ error: 'Loan installment not found' });
+    }
+
+    if (stage !== undefined) installment.stage = stage.trim();
+    if (amount !== undefined) installment.amount = parseFloat(amount);
+    if (disbursementDate !== undefined) installment.disbursementDate = new Date(disbursementDate);
+    if (description !== undefined) installment.description = description.trim();
+    if (referenceNumber !== undefined) installment.referenceNumber = referenceNumber.trim();
+    if (bankName !== undefined) installment.bankName = bankName.trim();
+    await installment.save();
+
+    // Re-sync settings
+    const allInstallments = await LoanInstallment.find();
+    const totalDisbursed = allInstallments.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const settings = await getOrCreateSettings();
+    settings.loanCashReceived = totalDisbursed;
+    await settings.save();
+
+    res.json(installment);
+  } catch (error) {
+    console.error('Error updating loan installment:', error);
+    res.status(500).json({ error: 'Failed to update loan installment' });
+  }
+});
+
+app.delete('/api/loan-installments/:id', async (req, res) => {
+  try {
+    const item = await LoanInstallment.findByIdAndDelete(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Loan installment not found' });
+    }
+
+    // Re-sync settings
+    const allInstallments = await LoanInstallment.find();
+    const totalDisbursed = allInstallments.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const settings = await getOrCreateSettings();
+    settings.loanCashReceived = totalDisbursed;
+    await settings.save();
+
+    res.json({ message: 'Loan installment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting loan installment:', error);
+    res.status(500).json({ error: 'Failed to delete loan installment' });
   }
 });
 
