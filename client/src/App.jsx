@@ -110,6 +110,24 @@ export default function App() {
     setActiveTab('total-cost');
   };
 
+  const handleUpdatePayment = async (paymentId, formData) => {
+    const res = await fetch(`/api/payments/${paymentId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Failed to update payment');
+    }
+
+    const updatedPayment = await res.json();
+    await loadData();
+    showToast('Payment updated successfully!');
+    setSelectedPayment(updatedPayment);
+    return updatedPayment;
+  };
+
   const handleDeletePayment = async (paymentId) => {
     const res = await fetch(`/api/payments/${paymentId}`, {
       method: 'DELETE'
@@ -323,6 +341,7 @@ export default function App() {
             onSubmitPayment={handleCreatePayment}
             onCancel={() => handleTabChange('dashboard')}
             defaultIsBuilder={defaultIsBuilderForNew}
+            fundSources={dashboardData?.fundSources}
           />
         )}
       </main>
@@ -339,6 +358,7 @@ export default function App() {
           payment={selectedPayment}
           onClose={() => setSelectedPayment(null)}
           onDelete={handleDeletePayment}
+          onUpdate={handleUpdatePayment}
         />
       )}
 

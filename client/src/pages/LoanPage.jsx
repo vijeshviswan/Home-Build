@@ -1,5 +1,5 @@
 import React from 'react';
-import { Landmark, SlidersHorizontal, FileText, ArrowRight } from 'lucide-react';
+import { Landmark, SlidersHorizontal, FileText, Plus } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import PaymentCard from '../components/PaymentCard';
 
@@ -11,18 +11,23 @@ export default function LoanPage({
   onNavigateNewPayment
 }) {
   const homeLoan = dashboardData?.homeLoan || {
-    totalHomeLoan: 0,
-    loanCashReceived: 0,
-    loanBalance: 0
+    totalHomeLoan: 3000000,
+    loanCashReceived: 1200000,
+    loanBalance: 1800000,
+    initialBalance: 3000000
   };
 
-  const disbursedPercentage = homeLoan.totalHomeLoan > 0 
-    ? Math.min(100, Math.round((homeLoan.loanCashReceived / homeLoan.totalHomeLoan) * 100)) 
-    : 0;
+  const initialSanctioned = homeLoan.initialBalance || homeLoan.totalHomeLoan || 3000000;
 
-  // Filter payments financed via Loan Cash
-  const loanPayments = payments.filter(p => p.category === 'Loan Cash');
+  // Filter payments financed via Home Loan
+  const loanPayments = payments.filter(
+    p => p.paymentSource === 'Home Loan' || p.category === 'Home Loan' || p.category === 'Loan Cash'
+  );
   const totalLoanSpent = loanPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const loanRemainingBalance = dashboardData?.fundSources?.homeLoan?.remainingBalance ?? Math.max(0, initialSanctioned - totalLoanSpent);
+  const percentRemaining = initialSanctioned > 0 
+    ? Math.max(0, Math.min(100, Math.round((loanRemainingBalance / initialSanctioned) * 100))) 
+    : 0;
 
   return (
     <div className="page-wrapper">
@@ -34,8 +39,8 @@ export default function LoanPage({
               <Landmark size={20} />
             </div>
             <div>
-              <div className="tile-title">Home Loan Summary</div>
-              <div className="tile-subtitle-text">Sanctioned loan & disbursements</div>
+              <div className="tile-title">Home Loan Account</div>
+              <div className="tile-subtitle-text">Sanctioned limit vs utilization</div>
             </div>
           </div>
           <button 
@@ -48,51 +53,51 @@ export default function LoanPage({
         </div>
 
         <div className="tile-hero-amount-block">
-          <span className="tile-hero-label">Loan Balance Remaining</span>
+          <span className="tile-hero-label">Home Loan Remaining Balance</span>
           <div className="tile-hero-val-row">
             <span className="tile-value-large tile-value-purple">
-              {formatCurrency(homeLoan.loanBalance)}
+              {formatCurrency(loanRemainingBalance)}
             </span>
-            <span className="tile-hero-pill-badge pill-purple">{disbursedPercentage}% Received</span>
+            <span className="tile-hero-pill-badge pill-purple">{percentRemaining}% Available</span>
           </div>
         </div>
 
         {/* PROGRESS TRACK */}
         <div className="progress-track-wrapper">
           <div className="progress-track">
-            <div className="progress-fill progress-fill-purple" style={{ width: `${disbursedPercentage}%` }} />
+            <div className="progress-fill progress-fill-purple" style={{ width: `${percentRemaining}%` }} />
           </div>
         </div>
 
         <div className="tile-stat-grid">
           <div className="tile-stat-item">
-            <span className="tile-stat-label">Total Home Loan</span>
+            <span className="tile-stat-label">Sanctioned Amount</span>
             <span className="tile-stat-value">
-              {formatCurrency(homeLoan.totalHomeLoan)}
+              {formatCurrency(initialSanctioned)}
             </span>
           </div>
           <div className="tile-stat-item">
-            <span className="tile-stat-label">Cash Received</span>
-            <span className="tile-stat-value" style={{ color: '#10b981' }}>
-              {formatCurrency(homeLoan.loanCashReceived)}
+            <span className="tile-stat-label">Total Loan Spent</span>
+            <span className="tile-stat-value" style={{ color: '#ef4444' }}>
+              {formatCurrency(totalLoanSpent)}
             </span>
           </div>
         </div>
       </div>
 
-      {/* LOAN CASH SPENT INFO */}
+      {/* LOAN DISBURSED CASH INFO */}
       <div className="summary-counter-card">
         <span className="summary-counter-label">
-          Loan Cash Utilized in Payments:
+          Loan Cash Disbursed to Bank:
         </span>
-        <span className="summary-counter-amount">
-          {formatCurrency(totalLoanSpent)}
+        <span className="summary-counter-amount" style={{ color: '#10b981' }}>
+          {formatCurrency(homeLoan.loanCashReceived)}
         </span>
       </div>
 
       {/* LOAN PAYMENTS LIST */}
       <div className="section-header">
-        <span className="section-title">Loan Payments History</span>
+        <span className="section-title">Home Loan Payments History</span>
         <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
           {loanPayments.length} {loanPayments.length === 1 ? 'record' : 'records'}
         </span>
@@ -101,10 +106,17 @@ export default function LoanPage({
       {loanPayments.length === 0 ? (
         <div className="empty-state">
           <FileText className="empty-state-icon" style={{ margin: '0 auto 8px' }} />
-          <div className="empty-state-title">No loan cash payments yet</div>
+          <div className="empty-state-title">No Home Loan payments yet</div>
           <div className="empty-state-desc">
-            When recording a payment, select "Loan Cash" as the category.
+            When recording a payment, select "Home Loan" as the payment source.
           </div>
+          <button
+            onClick={onNavigateNewPayment}
+            className="btn-submit"
+            style={{ maxWidth: '200px', margin: '16px auto 0', padding: '10px 16px', fontSize: '0.9rem' }}
+          >
+            <Plus size={16} /> Add Loan Payment
+          </button>
         </div>
       ) : (
         loanPayments.map((p) => (

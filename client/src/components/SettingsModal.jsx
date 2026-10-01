@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Wallet, Landmark } from 'lucide-react';
 
 export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
   const [formData, setFormData] = useState({
     totalBuildingCost: '',
     totalHomeLoan: '',
     loanCashReceived: '',
+    ownCashInitialBalance: '',
+    homeLoanInitialBalance: '',
     builderName: '',
     builderContractAmount: ''
   });
@@ -27,6 +29,8 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
         totalBuildingCost: settings.totalBuildingCost ?? 5000000,
         totalHomeLoan: settings.totalHomeLoan ?? 3000000,
         loanCashReceived: settings.loanCashReceived ?? 1200000,
+        ownCashInitialBalance: settings.ownCashInitialBalance ?? 130000,
+        homeLoanInitialBalance: settings.homeLoanInitialBalance ?? (settings.totalHomeLoan ?? 3000000),
         builderName: settings.builderName || 'Sri Krishna Builders',
         builderContractAmount: settings.builderContractAmount ?? 3500000
       });
@@ -43,6 +47,8 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
         totalBuildingCost: parseFloat(formData.totalBuildingCost) || 0,
         totalHomeLoan: parseFloat(formData.totalHomeLoan) || 0,
         loanCashReceived: parseFloat(formData.loanCashReceived) || 0,
+        ownCashInitialBalance: parseFloat(formData.ownCashInitialBalance) || 0,
+        homeLoanInitialBalance: parseFloat(formData.homeLoanInitialBalance) || 0,
         builderName: formData.builderName.trim(),
         builderContractAmount: parseFloat(formData.builderContractAmount) || 0
       });
@@ -59,7 +65,7 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="modal-drag-handle" />
         <div className="modal-header">
-          <h2 className="modal-title">Project & Loan Settings</h2>
+          <h2 className="modal-title">Project & Account Settings</h2>
           <button className="icon-btn modal-close-btn" onClick={onClose} aria-label="Close">
             <X size={20} strokeWidth={2.5} />
           </button>
@@ -113,6 +119,49 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
         )}
 
         <form onSubmit={handleSubmit}>
+          {/* FUND SOURCE INITIAL BALANCES */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+              Fund Sources Initial Balances
+            </div>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: '12px' }}>
+              Expenses are dynamically deducted from these initial balances.
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Wallet size={15} color="#059669" /> Own Cash Starting Balance (₹)
+              </label>
+              <input
+                type="number"
+                className="form-input"
+                value={formData.ownCashInitialBalance}
+                onChange={(e) => setFormData({ ...formData, ownCashInitialBalance: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Landmark size={15} color="#4f46e5" /> Home Loan Sanctioned / Starting (₹)
+              </label>
+              <input
+                type="number"
+                className="form-input"
+                value={formData.homeLoanInitialBalance}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  homeLoanInitialBalance: e.target.value,
+                  totalHomeLoan: e.target.value 
+                })}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={{ height: '1px', background: '#e2e8f0', margin: '16px 0' }} />
+
+          {/* PROJECT BUDGET & LOAN DISBURSEMENT */}
           <div className="form-group">
             <label className="form-label">Total Estimated Building Cost (₹)</label>
             <input
@@ -125,18 +174,7 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Total Home Loan Sanctioned (₹)</label>
-            <input
-              type="number"
-              className="form-input"
-              value={formData.totalHomeLoan}
-              onChange={(e) => setFormData({ ...formData, totalHomeLoan: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Loan Cash Disbursed / Received (₹)</label>
+            <label className="form-label">Loan Cash Disbursed / Received into Bank (₹)</label>
             <input
               type="number"
               className="form-input"
@@ -148,6 +186,7 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
 
           <div style={{ height: '1px', background: '#e2e8f0', margin: '16px 0' }} />
 
+          {/* BUILDER DETAILS */}
           <div className="form-group">
             <label className="form-label">Builder Name</label>
             <input

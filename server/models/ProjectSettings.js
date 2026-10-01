@@ -22,6 +22,14 @@ const projectSettingsSchema = new mongoose.Schema({
     type: Number,
     default: 1200000 // e.g. 12 Lakhs
   },
+  ownCashInitialBalance: {
+    type: Number,
+    default: 130000 // Initial Own Cash funds
+  },
+  homeLoanInitialBalance: {
+    type: Number,
+    default: 3000000 // Initial Home Loan sanctioned funds
+  },
   updatedAt: {
     type: Date,
     default: Date.now

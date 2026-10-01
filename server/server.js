@@ -11,6 +11,7 @@ const multer = require('multer');
 const Payment = require('./models/Payment');
 const ProjectSettings = require('./models/ProjectSettings');
 const CashSource = require('./models/CashSource');
+const FundSource = require('./models/FundSource');
 const { uploadImageToDrive, deleteFileFromDrive } = require('./services/googleDriveService');
 const { generateAuthUrl, exchangeCodeForTokens, isOAuthReady } = require('./services/googleOAuthService');
 
@@ -51,10 +52,80 @@ async function getOrCreateSettings() {
       builderContractAmount: 3500000,
       totalBuildingCost: 5000000,
       totalHomeLoan: 3000000,
-      loanCashReceived: 1200000
+      loanCashReceived: 1200000,
+      ownCashInitialBalance: 130000,
+      homeLoanInitialBalance: 3000000
     });
   }
   return settings;
+}
+
+// Helper: Ensure fund sources ("Own Cash" & "Home Loan") exist
+async function getOrCreateFundSources(settings) {
+  let ownCash = await FundSource.findOne({ name: 'Own Cash' });
+  if (!ownCash) {
+    ownCash = await FundSource.create({
+      name: 'Own Cash',
+      initialBalance: settings?.ownCashInitialBalance !== undefined ? settings.ownCashInitialBalance : 130000,
+      description: 'Personal savings & own cash funds'
+    });
+  }
+
+  let homeLoan = await FundSource.findOne({ name: 'Home Loan' });
+  if (!homeLoan) {
+    homeLoan = await FundSource.create({
+      name: 'Home Loan',
+      initialBalance: settings?.homeLoanInitialBalance !== undefined ? settings.homeLoanInitialBalance : (settings?.totalHomeLoan || 3000000),
+      description: 'Sanctioned home loan funds'
+    });
+  }
+
+  return { ownCash, homeLoan };
+}
+
+// Migration: Ensure existing payments and settings conform to new fund sources schema
+async function migrateExistingData() {
+  try {
+    const settings = await getOrCreateSettings();
+    if (settings.ownCashInitialBalance === undefined || settings.ownCashInitialBalance === null) {
+      settings.ownCashInitialBalance = 130000;
+      await settings.save();
+    }
+    if (settings.homeLoanInitialBalance === undefined || settings.homeLoanInitialBalance === null) {
+      settings.homeLoanInitialBalance = settings.totalHomeLoan || 3000000;
+      await settings.save();
+    }
+
+    const { ownCash, homeLoan } = await getOrCreateFundSources(settings);
+    if (settings.ownCashInitialBalance !== undefined && ownCash.initialBalance === 0 && settings.ownCashInitialBalance > 0) {
+      ownCash.initialBalance = settings.ownCashInitialBalance;
+      await ownCash.save();
+    }
+    if (settings.homeLoanInitialBalance !== undefined && homeLoan.initialBalance === 0 && settings.homeLoanInitialBalance > 0) {
+      homeLoan.initialBalance = settings.homeLoanInitialBalance;
+      await homeLoan.save();
+    }
+
+    // Migrate payments: populate paymentSource if missing or if category was Loan Cash
+    const payments = await Payment.find();
+    for (const p of payments) {
+      let changed = false;
+      if (!p.paymentSource) {
+        p.paymentSource = (p.category === 'Loan Cash' || p.category === 'Home Loan') ? 'Home Loan' : 'Own Cash';
+        changed = true;
+      }
+      if (p.category === 'Loan Cash') {
+        p.category = 'Home Loan';
+        changed = true;
+      }
+      if (changed) {
+        await p.save();
+      }
+    }
+    console.log('[Migration] Database schemas and fund sources initialized successfully.');
+  } catch (err) {
+    console.error('[Migration Error]:', err.message);
+  }
 }
 
 // Seed initial sample data if database is empty
@@ -234,12 +305,28 @@ app.get('/api/auth/google/callback', async (req, res) => {
 app.get('/api/dashboard', async (req, res) => {
   try {
     const settings = await getOrCreateSettings();
+    const fundSourcesDocs = await getOrCreateFundSources(settings);
 
-    // Total Amount Paid from all payments
-    const totalPaymentsResult = await Payment.aggregate([
+    // Payments grouped by fund source
+    const ownCashPayments = await Payment.aggregate([
+      { $match: { $or: [{ paymentSource: 'Own Cash' }, { category: 'Own Cash' }] } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
-    const totalAmountPaid = totalPaymentsResult.length > 0 ? totalPaymentsResult[0].total : 0;
+    const ownCashSpent = ownCashPayments.length > 0 ? ownCashPayments[0].total : 0;
+
+    const homeLoanPayments = await Payment.aggregate([
+      { $match: { $or: [{ paymentSource: 'Home Loan' }, { category: 'Home Loan' }, { category: 'Loan Cash' }] } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const homeLoanSpent = homeLoanPayments.length > 0 ? homeLoanPayments[0].total : 0;
+
+    const totalAmountPaid = ownCashSpent + homeLoanSpent;
+
+    const ownCashInitial = fundSourcesDocs.ownCash.initialBalance || 0;
+    const homeLoanInitial = fundSourcesDocs.homeLoan.initialBalance || 0;
+
+    const ownCashRemaining = ownCashInitial - ownCashSpent;
+    const homeLoanRemaining = homeLoanInitial - homeLoanSpent;
 
     // Builder Payments
     const builderPaymentsResult = await Payment.aggregate([
@@ -265,10 +352,31 @@ app.get('/api/dashboard', async (req, res) => {
     res.json({
       totalBuildingCost: settings.totalBuildingCost,
       totalAmountPaid,
+      totalSpent: totalAmountPaid,
+      fundSources: {
+        ownCash: {
+          name: 'Own Cash',
+          initialBalance: ownCashInitial,
+          totalSpent: ownCashSpent,
+          remainingBalance: ownCashRemaining
+        },
+        homeLoan: {
+          name: 'Home Loan',
+          initialBalance: homeLoanInitial,
+          totalSpent: homeLoanSpent,
+          remainingBalance: homeLoanRemaining
+        },
+        totalInitial: ownCashInitial + homeLoanInitial,
+        totalSpent: totalAmountPaid,
+        totalRemaining: ownCashRemaining + homeLoanRemaining
+      },
       homeLoan: {
         totalHomeLoan,
         loanCashReceived,
-        loanBalance
+        loanBalance,
+        initialBalance: homeLoanInitial,
+        totalSpent: homeLoanSpent,
+        remainingBalance: homeLoanRemaining
       },
       builder: {
         builderName: settings.builderName,
@@ -288,11 +396,22 @@ app.get('/api/dashboard', async (req, res) => {
 // 2. GET PAYMENTS (with search & filter)
 app.get('/api/payments', async (req, res) => {
   try {
-    const { category, search, date, isBuilder } = req.query;
+    const { category, paymentSource, search, date, isBuilder } = req.query;
     const filter = {};
 
-    if (category && category !== 'All') {
-      filter.category = category;
+    const sourceFilter = paymentSource || category;
+    if (sourceFilter && sourceFilter !== 'All') {
+      if (sourceFilter === 'Own Cash') {
+        filter.$or = [{ paymentSource: 'Own Cash' }, { category: 'Own Cash' }];
+      } else if (sourceFilter === 'Home Loan' || sourceFilter === 'Loan Cash') {
+        filter.$or = [
+          { paymentSource: 'Home Loan' },
+          { category: 'Home Loan' },
+          { category: 'Loan Cash' }
+        ];
+      } else {
+        filter.category = sourceFilter;
+      }
     }
 
     if (search && search.trim() !== '') {
@@ -327,11 +446,14 @@ app.get('/api/payments', async (req, res) => {
 // 3. CREATE PAYMENT (Google Drive Upload)
 app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
   try {
-    const { date, category, paymentMethod, amount, description, isBuilderPayment } = req.body;
+    const { date, category, paymentSource, paymentMethod, amount, description, isBuilderPayment } = req.body;
 
-    if (!amount || !description || !category || !paymentMethod) {
+    const sourceVal = paymentSource || category;
+    if (!amount || !description || !sourceVal || !paymentMethod) {
       return res.status(400).json({ error: 'Please provide all required fields' });
     }
+
+    const normalizedSource = (sourceVal === 'Loan Cash' || sourceVal === 'Home Loan') ? 'Home Loan' : 'Own Cash';
 
     let proofFileId = '';
     let proofUrl = '';
@@ -357,7 +479,8 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
 
     const newPayment = await Payment.create({
       date: date ? new Date(date) : new Date(),
-      category,
+      paymentSource: normalizedSource,
+      category: normalizedSource,
       paymentMethod,
       amount: parseFloat(amount),
       description: description.trim(),
@@ -384,6 +507,64 @@ app.get('/api/payments/:id', async (req, res) => {
     res.json(payment);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch payment' });
+  }
+});
+
+// 4b. EDIT / UPDATE PAYMENT
+app.put('/api/payments/:id', upload.single('proofImage'), async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    const { date, category, paymentSource, paymentMethod, amount, description, isBuilderPayment } = req.body;
+
+    if (amount !== undefined) payment.amount = parseFloat(amount);
+    if (description !== undefined) payment.description = description.trim();
+    if (date !== undefined) payment.date = new Date(date);
+    if (paymentMethod !== undefined) payment.paymentMethod = paymentMethod;
+    if (isBuilderPayment !== undefined) {
+      payment.isBuilderPayment = isBuilderPayment === 'true' || isBuilderPayment === true;
+    }
+
+    const sourceVal = paymentSource || category;
+    if (sourceVal) {
+      const normalizedSource = (sourceVal === 'Loan Cash' || sourceVal === 'Home Loan') ? 'Home Loan' : 'Own Cash';
+      payment.paymentSource = normalizedSource;
+      payment.category = normalizedSource;
+    }
+
+    // Handle replacement proof file upload if provided
+    if (req.file) {
+      try {
+        const driveResult = await uploadImageToDrive(
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype
+        );
+        // Clean up previous file from Drive
+        if (payment.proofFileId) {
+          try {
+            await deleteFileFromDrive(payment.proofFileId);
+          } catch (e) {
+            console.warn('Could not delete old proof image from Drive:', e.message);
+          }
+        }
+        payment.proofFileId = driveResult.fileId;
+        payment.proofUrl = driveResult.proofUrl || driveResult.webViewLink;
+        payment.proofImage = payment.proofUrl;
+      } catch (driveErr) {
+        console.error('Google Drive update upload failed:', driveErr.message);
+        return res.status(502).json({ error: `Google Drive upload failed: ${driveErr.message}` });
+      }
+    }
+
+    await payment.save();
+    res.json(payment);
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: error.message || 'Failed to update payment' });
   }
 });
 
@@ -458,19 +639,126 @@ app.get('/api/settings', async (req, res) => {
 app.put('/api/settings', async (req, res) => {
   try {
     let settings = await getOrCreateSettings();
-    const { builderName, builderContractAmount, totalBuildingCost, totalHomeLoan, loanCashReceived } = req.body;
+    const fundSourcesDocs = await getOrCreateFundSources(settings);
+    const { 
+      builderName, 
+      builderContractAmount, 
+      totalBuildingCost, 
+      totalHomeLoan, 
+      loanCashReceived,
+      ownCashInitialBalance,
+      homeLoanInitialBalance
+    } = req.body;
 
     if (builderName !== undefined) settings.builderName = builderName;
     if (builderContractAmount !== undefined) settings.builderContractAmount = parseFloat(builderContractAmount);
     if (totalBuildingCost !== undefined) settings.totalBuildingCost = parseFloat(totalBuildingCost);
     if (totalHomeLoan !== undefined) settings.totalHomeLoan = parseFloat(totalHomeLoan);
     if (loanCashReceived !== undefined) settings.loanCashReceived = parseFloat(loanCashReceived);
-    settings.updatedAt = new Date();
 
+    if (ownCashInitialBalance !== undefined) {
+      const val = parseFloat(ownCashInitialBalance) || 0;
+      settings.ownCashInitialBalance = val;
+      fundSourcesDocs.ownCash.initialBalance = val;
+      fundSourcesDocs.ownCash.updatedAt = new Date();
+      await fundSourcesDocs.ownCash.save();
+    }
+
+    if (homeLoanInitialBalance !== undefined) {
+      const val = parseFloat(homeLoanInitialBalance) || 0;
+      settings.homeLoanInitialBalance = val;
+      fundSourcesDocs.homeLoan.initialBalance = val;
+      fundSourcesDocs.homeLoan.updatedAt = new Date();
+      await fundSourcesDocs.homeLoan.save();
+    }
+
+    settings.updatedAt = new Date();
     await settings.save();
     res.json(settings);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// 8b. FUND SOURCES ROUTES
+app.get('/api/fund-sources', async (req, res) => {
+  try {
+    const settings = await getOrCreateSettings();
+    const fundSourcesDocs = await getOrCreateFundSources(settings);
+
+    const ownCashPayments = await Payment.aggregate([
+      { $match: { $or: [{ paymentSource: 'Own Cash' }, { category: 'Own Cash' }] } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const ownCashSpent = ownCashPayments.length > 0 ? ownCashPayments[0].total : 0;
+
+    const homeLoanPayments = await Payment.aggregate([
+      { $match: { $or: [{ paymentSource: 'Home Loan' }, { category: 'Home Loan' }, { category: 'Loan Cash' }] } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const homeLoanSpent = homeLoanPayments.length > 0 ? homeLoanPayments[0].total : 0;
+
+    const ownCashInitial = fundSourcesDocs.ownCash.initialBalance || 0;
+    const homeLoanInitial = fundSourcesDocs.homeLoan.initialBalance || 0;
+
+    const sources = [
+      {
+        _id: fundSourcesDocs.ownCash._id,
+        name: 'Own Cash',
+        initialBalance: ownCashInitial,
+        totalSpent: ownCashSpent,
+        remainingBalance: ownCashInitial - ownCashSpent,
+        description: fundSourcesDocs.ownCash.description
+      },
+      {
+        _id: fundSourcesDocs.homeLoan._id,
+        name: 'Home Loan',
+        initialBalance: homeLoanInitial,
+        totalSpent: homeLoanSpent,
+        remainingBalance: homeLoanInitial - homeLoanSpent,
+        description: fundSourcesDocs.homeLoan.description
+      }
+    ];
+
+    res.json({
+      sources,
+      totalInitial: ownCashInitial + homeLoanInitial,
+      totalSpent: ownCashSpent + homeLoanSpent,
+      totalRemaining: (ownCashInitial - ownCashSpent) + (homeLoanInitial - homeLoanSpent)
+    });
+  } catch (error) {
+    console.error('Error fetching fund sources:', error);
+    res.status(500).json({ error: 'Failed to fetch fund sources' });
+  }
+});
+
+app.put('/api/fund-sources', async (req, res) => {
+  try {
+    const { ownCashInitialBalance, homeLoanInitialBalance } = req.body;
+    const settings = await getOrCreateSettings();
+    const fundSourcesDocs = await getOrCreateFundSources(settings);
+
+    if (ownCashInitialBalance !== undefined) {
+      const val = parseFloat(ownCashInitialBalance) || 0;
+      fundSourcesDocs.ownCash.initialBalance = val;
+      fundSourcesDocs.ownCash.updatedAt = new Date();
+      await fundSourcesDocs.ownCash.save();
+      settings.ownCashInitialBalance = val;
+    }
+
+    if (homeLoanInitialBalance !== undefined) {
+      const val = parseFloat(homeLoanInitialBalance) || 0;
+      fundSourcesDocs.homeLoan.initialBalance = val;
+      fundSourcesDocs.homeLoan.updatedAt = new Date();
+      await fundSourcesDocs.homeLoan.save();
+      settings.homeLoanInitialBalance = val;
+    }
+
+    await settings.save();
+    res.json({ message: 'Fund sources updated successfully', fundSources: fundSourcesDocs });
+  } catch (error) {
+    console.error('Error updating fund sources:', error);
+    res.status(500).json({ error: 'Failed to update fund sources' });
   }
 });
 
@@ -574,6 +862,7 @@ mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB successfully.');
     await getOrCreateSettings();
+    await migrateExistingData();
     await seedInitialData();
     app.listen(PORT, () => {
       console.log(`Server listening on port ${PORT}`);

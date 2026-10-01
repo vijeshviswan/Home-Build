@@ -10,8 +10,9 @@ export default function SearchPage({ payments, onSelectPayment }) {
 
   // Client-side filtering for instantaneous mobile responsiveness
   const filteredPayments = payments.filter((payment) => {
-    // 1. Category filter
-    if (categoryFilter !== 'All' && payment.category !== categoryFilter) {
+    // 1. Payment source / Category filter
+    const src = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category);
+    if (categoryFilter !== 'All' && src !== categoryFilter) {
       return false;
     }
 
@@ -74,7 +75,7 @@ export default function SearchPage({ payments, onSelectPayment }) {
         <div className="filter-row">
           <div>
             <label className="form-label" style={{ fontSize: '0.78rem' }}>
-              Category
+              Payment Source
             </label>
             <select
               className="form-select"
@@ -83,9 +84,9 @@ export default function SearchPage({ payments, onSelectPayment }) {
               onChange={(e) => setCategoryFilter(e.target.value)}
               id="filter-category"
             >
-              <option value="All">All Categories</option>
+              <option value="All">All Sources</option>
               <option value="Own Cash">Own Cash</option>
-              <option value="Loan Cash">Loan Cash</option>
+              <option value="Home Loan">Home Loan</option>
             </select>
           </div>
 

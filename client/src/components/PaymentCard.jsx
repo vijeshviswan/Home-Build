@@ -3,7 +3,8 @@ import { formatCurrency, formatDate } from '../utils/formatters';
 import { Paperclip, HardHat, Landmark, IndianRupee, ChevronRight } from 'lucide-react';
 
 export default function PaymentCard({ payment, onSelect }) {
-  const isLoan = payment.category === 'Loan Cash';
+  const sourceName = payment.paymentSource || (payment.category === 'Loan Cash' ? 'Home Loan' : payment.category) || 'Own Cash';
+  const isLoan = sourceName === 'Home Loan';
   const isBuilder = payment.isBuilderPayment;
 
   return (
@@ -43,7 +44,7 @@ export default function PaymentCard({ payment, onSelect }) {
       <div className="payment-card-footer">
         <div className="tags-group">
           <span className={`tag ${isLoan ? 'tag-loan' : 'tag-own'}`}>
-            {payment.category}
+            {sourceName}
           </span>
           <span className="tag tag-method">
             {payment.paymentMethod}
@@ -65,4 +66,3 @@ export default function PaymentCard({ payment, onSelect }) {
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import React from 'react';
-import { IndianRupee, Landmark, HardHat, Wallet, Search, Printer, Sparkles } from 'lucide-react';
+import { IndianRupee, Landmark, HardHat, Wallet, Search, Printer, Sparkles, TrendingDown, ArrowUpRight } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 
 export default function Dashboard({ 
@@ -9,8 +9,35 @@ export default function Dashboard({
   totalCashReceived = 0,
   payments = []
 }) {
-  const totalAmountPaid = dashboardData?.totalAmountPaid ?? 0;
-  const loanBalance = dashboardData?.homeLoan?.loanBalance ?? 0;
+  // Extract or compute dynamic fund source balances
+  const fundSources = dashboardData?.fundSources;
+  const ownCashData = fundSources?.ownCash;
+  const homeLoanData = fundSources?.homeLoan;
+
+  // Own Cash calculations
+  const ownCashInitial = ownCashData?.initialBalance ?? 130000;
+  const ownCashSpent = ownCashData?.totalSpent ?? payments
+    .filter(p => (p.paymentSource === 'Own Cash' || p.category === 'Own Cash'))
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const ownCashRemaining = ownCashData?.remainingBalance ?? (ownCashInitial - ownCashSpent);
+  const ownCashPercentRemaining = ownCashInitial > 0 
+    ? Math.max(0, Math.min(100, Math.round((ownCashRemaining / ownCashInitial) * 100))) 
+    : 0;
+
+  // Home Loan calculations
+  const homeLoanInitial = homeLoanData?.initialBalance ?? (dashboardData?.homeLoan?.totalHomeLoan || 3000000);
+  const homeLoanSpent = homeLoanData?.totalSpent ?? payments
+    .filter(p => (p.paymentSource === 'Home Loan' || p.category === 'Home Loan' || p.category === 'Loan Cash'))
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const homeLoanRemaining = homeLoanData?.remainingBalance ?? (homeLoanInitial - homeLoanSpent);
+  const homeLoanPercentRemaining = homeLoanInitial > 0 
+    ? Math.max(0, Math.min(100, Math.round((homeLoanRemaining / homeLoanInitial) * 100))) 
+    : 0;
+
+  // Total Construction Spent
+  const totalSpent = dashboardData?.totalSpent ?? (dashboardData?.totalAmountPaid ?? (ownCashSpent + homeLoanSpent));
+
+  // Builder info
   const builderPaid = builderData?.totalPaid ?? dashboardData?.builder?.amountPaid ?? 0;
 
   return (
@@ -27,6 +54,150 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* DYNAMIC FINANCIAL BALANCE OVERVIEW SECTION */}
+      <section className="balance-overview-section" aria-label="Financial Balance Overview">
+        <div className="balance-overview-header">
+          <div className="balance-section-title">
+            <span>Account Balances & Spending</span>
+          </div>
+          <span className="balance-section-subtitle">Dynamic live balance</span>
+        </div>
+
+        {/* 1. TOTAL SPENT CARD (Primary Overview) */}
+        <div 
+          className="total-spent-card" 
+          onClick={() => onNavigate('total-cost')}
+          style={{ cursor: 'pointer' }}
+          role="button"
+          tabIndex={0}
+          id="card-total-spent"
+        >
+          <div className="total-spent-top-row">
+            <div className="total-spent-label-group">
+              <div className="total-spent-icon-circle">
+                <IndianRupee size={16} strokeWidth={2.8} />
+              </div>
+              <span className="total-spent-label">Total Spent to Date</span>
+            </div>
+            <span className="total-spent-count-pill">
+              {payments.length} {payments.length === 1 ? 'Payment' : 'Payments'}
+            </span>
+          </div>
+
+          <div className="total-spent-amount">
+            {formatCurrency(totalSpent)}
+          </div>
+
+          <div className="total-spent-subtext">
+            Combined expenses paid across Own Cash & Home Loan
+          </div>
+        </div>
+
+        {/* 2. DYNAMIC OWN CASH & HOME LOAN BALANCE CARDS */}
+        <div className="fund-balance-grid">
+          {/* OWN CASH CARD */}
+          <div 
+            className="fund-balance-card fund-balance-card-own"
+            onClick={() => onNavigate('total-cost')}
+            id="card-own-cash-balance"
+            role="button"
+            tabIndex={0}
+          >
+            <div className="fund-card-top">
+              <div className="fund-icon-title">
+                <div className="fund-icon-circle">
+                  <Wallet size={16} strokeWidth={2.4} />
+                </div>
+                <span className="fund-card-name">Own Cash</span>
+              </div>
+              <span className="fund-badge">
+                {ownCashPercentRemaining}% Left
+              </span>
+            </div>
+
+            <div className="fund-remaining-block">
+              <div className="fund-remaining-label">Remaining Balance</div>
+              <div className="fund-remaining-num">
+                {formatCurrency(ownCashRemaining)}
+              </div>
+            </div>
+
+            <div className="fund-progress-wrapper">
+              <div className="fund-progress-track">
+                <div 
+                  className="fund-progress-fill" 
+                  style={{ width: `${ownCashPercentRemaining}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="fund-split-row">
+              <div className="fund-split-col">
+                <span className="fund-split-label">Starting</span>
+                <span className="fund-split-val">{formatCurrency(ownCashInitial)}</span>
+              </div>
+              <div className="fund-split-col" style={{ textAlign: 'right' }}>
+                <span className="fund-split-label">Spent</span>
+                <span className="fund-split-val" style={{ color: '#e11d48' }}>
+                  {formatCurrency(ownCashSpent)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* HOME LOAN CARD */}
+          <div 
+            className="fund-balance-card fund-balance-card-loan"
+            onClick={() => onNavigate('home-loan')}
+            id="card-home-loan-balance"
+            role="button"
+            tabIndex={0}
+          >
+            <div className="fund-card-top">
+              <div className="fund-icon-title">
+                <div className="fund-icon-circle">
+                  <Landmark size={16} strokeWidth={2.4} />
+                </div>
+                <span className="fund-card-name">Home Loan</span>
+              </div>
+              <span className="fund-badge">
+                {homeLoanPercentRemaining}% Left
+              </span>
+            </div>
+
+            <div className="fund-remaining-block">
+              <div className="fund-remaining-label">Remaining Balance</div>
+              <div className="fund-remaining-num">
+                {formatCurrency(homeLoanRemaining)}
+              </div>
+            </div>
+
+            <div className="fund-progress-wrapper">
+              <div className="fund-progress-track">
+                <div 
+                  className="fund-progress-fill" 
+                  style={{ width: `${homeLoanPercentRemaining}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="fund-split-row">
+              <div className="fund-split-col">
+                <span className="fund-split-label">Starting</span>
+                <span className="fund-split-val">{formatCurrency(homeLoanInitial)}</span>
+              </div>
+              <div className="fund-split-col" style={{ textAlign: 'right' }}>
+                <span className="fund-split-label">Spent</span>
+                <span className="fund-split-val" style={{ color: '#e11d48' }}>
+                  {formatCurrency(homeLoanSpent)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* QUICK ACCESS MENU TILES */}
       <div className="dashboard-menu-grid">
         {/* TILE 1: TOTAL COST (Coral-Red) */}
         <button
@@ -42,7 +213,7 @@ export default function Dashboard({
             </div>
           </div>
           <div className="tile-main-row">
-            <span className="tile-primary-value">{formatCurrency(totalAmountPaid)}</span>
+            <span className="tile-primary-value">{formatCurrency(totalSpent)}</span>
           </div>
           <div className="tile-bottom-row">
             <span className="tile-bottom-subtext">Estimated budget vs paid</span>
@@ -63,10 +234,10 @@ export default function Dashboard({
             </div>
           </div>
           <div className="tile-main-row">
-            <span className="tile-primary-value">{formatCurrency(loanBalance)}</span>
+            <span className="tile-primary-value">{formatCurrency(homeLoanRemaining)}</span>
           </div>
           <div className="tile-bottom-row">
-            <span className="tile-bottom-subtext">Loan balance remaining</span>
+            <span className="tile-bottom-subtext">Sanctioned & disbursed</span>
           </div>
         </button>
 
@@ -129,7 +300,7 @@ export default function Dashboard({
             <span className="tile-primary-value">{payments.length} Payments</span>
           </div>
           <div className="tile-bottom-row">
-            <span className="tile-bottom-subtext">Filter by date & category</span>
+            <span className="tile-bottom-subtext">Filter by date & source</span>
           </div>
         </button>
 
@@ -157,4 +328,3 @@ export default function Dashboard({
     </div>
   );
 }
-

@@ -6,10 +6,16 @@ const paymentSchema = new mongoose.Schema({
     required: [true, 'Payment date is required'],
     default: Date.now
   },
+  paymentSource: {
+    type: String,
+    enum: ['Own Cash', 'Home Loan'],
+    default: 'Own Cash',
+    required: [true, 'Payment source is required']
+  },
   category: {
     type: String,
-    enum: ['Own Cash', 'Loan Cash'],
-    required: [true, 'Category is required']
+    enum: ['Own Cash', 'Home Loan', 'Loan Cash'],
+    default: 'Own Cash'
   },
   paymentMethod: {
     type: String,
@@ -45,6 +51,28 @@ const paymentSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  }
+});
+
+paymentSchema.pre('validate', function() {
+  if (this.paymentSource) {
+    if (this.paymentSource === 'Loan Cash') {
+      this.paymentSource = 'Home Loan';
+    }
+    if (!this.category) {
+      this.category = this.paymentSource;
+    }
+  } else if (this.category) {
+    if (this.category === 'Loan Cash' || this.category === 'Home Loan') {
+      this.paymentSource = 'Home Loan';
+      this.category = 'Home Loan';
+    } else {
+      this.paymentSource = 'Own Cash';
+      this.category = 'Own Cash';
+    }
+  } else {
+    this.paymentSource = 'Own Cash';
+    this.category = 'Own Cash';
   }
 });
 

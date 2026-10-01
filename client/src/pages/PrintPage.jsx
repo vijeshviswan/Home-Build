@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, Calendar, FileText, CheckCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Printer, Calendar, FileText, CheckCircle, ArrowDownLeft, ArrowUpRight, Wallet, Landmark } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
 export default function PrintPage({ payments, cashSources, dashboardData }) {
@@ -33,6 +33,14 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
   const monthBuilderPayments = monthPayments.filter((p) => p.isBuilderPayment);
   const monthOtherPayments = monthPayments.filter((p) => !p.isBuilderPayment);
 
+  // Separate by source
+  const monthOwnCashPayments = monthPayments.filter(
+    (p) => (p.paymentSource === 'Own Cash' || p.category === 'Own Cash')
+  );
+  const monthHomeLoanPayments = monthPayments.filter(
+    (p) => (p.paymentSource === 'Home Loan' || p.category === 'Home Loan' || p.category === 'Loan Cash')
+  );
+
   // Calculations
   const totalCashSourcesReceived = monthCashSources.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalMoneyReceived = totalCashSourcesReceived;
@@ -41,10 +49,21 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
   const totalOtherPayments = monthOtherPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalPayments = totalBuilderPayments + totalOtherPayments;
 
+  const monthOwnCashSpent = monthOwnCashPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const monthHomeLoanSpent = monthHomeLoanPayments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
   const balanceDifference = totalMoneyReceived - totalPayments;
+
+  // Global remaining balances
+  const ownCashRemaining = dashboardData?.fundSources?.ownCash?.remainingBalance ?? 123000;
+  const homeLoanRemaining = dashboardData?.fundSources?.homeLoan?.remainingBalance ?? 3000000;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const getSourceLabel = (p) => {
+    return p.paymentSource || (p.category === 'Loan Cash' ? 'Home Loan' : p.category) || 'Own Cash';
   };
 
   return (
@@ -85,35 +104,51 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
       <div className="printable-statement" id="printable-area">
         {/* HEADER */}
         <div className="statement-header">
-          <div className="statement-title">Monthly Statement</div>
+          <div className="statement-title">Monthly Construction Statement</div>
           <div className="statement-month-pill">{monthLabel}</div>
           <div className="statement-meta">
-            Generated on: {formatDate(new Date())} • Personal House Construction
+            Generated on: {formatDate(new Date())} • House Construction Payment Tracker
           </div>
         </div>
 
         {/* MONTHLY SUMMARY CARD / TABLE */}
         <div className="statement-section">
-          <div className="statement-section-title">Monthly Summary</div>
+          <div className="statement-section-title">Monthly Financial Summary</div>
 
           <div className="table-wrapper-block">
             <table className="statement-table">
               <tbody>
                 <tr>
-                  <td className="stat-label">Total Money Received</td>
+                  <td className="stat-label">Total Cash Inflow Received (External / Borrowed)</td>
                   <td className="stat-val" style={{ color: '#059669' }}>
                     {formatCurrency(totalMoneyReceived)}
                   </td>
                 </tr>
                 <tr>
-                  <td className="stat-label">Total Payments</td>
+                  <td className="stat-label">Total Monthly Expenses Paid</td>
                   <td className="stat-val" style={{ color: '#e11d48' }}>
                     {formatCurrency(totalPayments)}
                   </td>
                 </tr>
                 <tr>
                   <td className="stat-sublabel" style={{ paddingLeft: '24px' }}>
-                    • Builder Payments
+                    • Paid via Own Cash
+                  </td>
+                  <td className="stat-subval">
+                    {formatCurrency(monthOwnCashSpent)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="stat-sublabel" style={{ paddingLeft: '24px' }}>
+                    • Paid via Home Loan
+                  </td>
+                  <td className="stat-subval">
+                    {formatCurrency(monthHomeLoanSpent)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="stat-sublabel" style={{ paddingLeft: '24px' }}>
+                    • Builder Payments Subtotal
                   </td>
                   <td className="stat-subval">
                     {formatCurrency(totalBuilderPayments)}
@@ -121,7 +156,7 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                 </tr>
                 <tr>
                   <td className="stat-sublabel" style={{ paddingLeft: '24px' }}>
-                    • Other Construction Payments
+                    • Other Construction Expenses Subtotal
                   </td>
                   <td className="stat-subval">
                     {formatCurrency(totalOtherPayments)}
@@ -129,10 +164,26 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                 </tr>
                 <tr className="stat-highlight-row">
                   <td className="stat-label" style={{ fontWeight: 800 }}>
-                    Balance / Difference
+                    Inflow - Outflow Difference
                   </td>
                   <td className="stat-val" style={{ fontWeight: 800, color: balanceDifference >= 0 ? '#059669' : '#e11d48' }}>
                     {formatCurrency(balanceDifference)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="stat-label" style={{ fontWeight: 700, color: '#047857' }}>
+                    Current Own Cash Remaining Balance
+                  </td>
+                  <td className="stat-val" style={{ fontWeight: 800, color: '#047857' }}>
+                    {formatCurrency(ownCashRemaining)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="stat-label" style={{ fontWeight: 700, color: '#4338ca' }}>
+                    Current Home Loan Remaining Balance
+                  </td>
+                  <td className="stat-val" style={{ fontWeight: 800, color: '#4338ca' }}>
+                    {formatCurrency(homeLoanRemaining)}
                   </td>
                 </tr>
               </tbody>
@@ -140,22 +191,22 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
           </div>
         </div>
 
-        {/* 1. MONEY RECEIVED */}
+        {/* 1. CASH INFLOW RECEIVED IN MONTH */}
         <div className="statement-section">
           <div className="statement-section-title">
-            Money Received ({monthCashSources.length})
+            1. Cash Inflow / Sources of Cash ({monthCashSources.length})
           </div>
 
           {monthCashSources.length === 0 ? (
-            <div className="statement-empty">No money received recorded for {monthLabel}.</div>
+            <div className="statement-empty">No borrowed cash sources recorded for this month.</div>
           ) : (
             <div className="table-wrapper-block">
               <table className="statement-table">
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Source</th>
-                    <th>Details</th>
+                    <th>Source / Person</th>
+                    <th>Details / Purpose</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                   </tr>
                 </thead>
@@ -164,7 +215,7 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                     <tr key={cs._id}>
                       <td>{formatDate(cs.date)}</td>
                       <td style={{ fontWeight: 600 }}>{cs.source}</td>
-                      <td style={{ color: '#64748b' }}>{cs.details || '-'}</td>
+                      <td>{cs.details || '-'}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: '#059669' }}>
                         {formatCurrency(cs.amount)}
                       </td>
@@ -173,9 +224,9 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={3} style={{ fontWeight: 700 }}>Total Received</td>
+                    <td colSpan={3} style={{ fontWeight: 700 }}>Total Inflow Received</td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#059669' }}>
-                      {formatCurrency(totalMoneyReceived)}
+                      {formatCurrency(totalCashSourcesReceived)}
                     </td>
                   </tr>
                 </tfoot>
@@ -184,27 +235,27 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
           )}
         </div>
 
-        {/* 2. PAYMENTS MADE */}
+        {/* 2. PAYMENTS BREAKDOWN */}
         <div className="statement-section">
           <div className="statement-section-title">
-            Payments Made ({monthPayments.length})
+            2. Construction Expenses Paid ({monthPayments.length})
           </div>
 
           {/* BUILDER PAYMENTS */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
-              Builder Payments ({monthBuilderPayments.length})
+              Contractor / Builder Payments ({monthBuilderPayments.length})
             </div>
             {monthBuilderPayments.length === 0 ? (
-              <div className="statement-empty">No builder payments in this month.</div>
+              <div className="statement-empty">No payments made to the builder in this month.</div>
             ) : (
-
               <div className="table-wrapper-block">
                 <table className="statement-table">
                   <thead>
                     <tr>
                       <th>Date</th>
                       <th>Description</th>
+                      <th>Source</th>
                       <th>Method</th>
                       <th style={{ textAlign: 'right' }}>Amount</th>
                     </tr>
@@ -214,6 +265,11 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                       <tr key={p._id}>
                         <td>{formatDate(p.date)}</td>
                         <td style={{ fontWeight: 600 }}>{p.description}</td>
+                        <td>
+                          <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
+                            {getSourceLabel(p)}
+                          </span>
+                        </td>
                         <td>{p.paymentMethod}</td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>
                           {formatCurrency(p.amount)}
@@ -223,7 +279,7 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={3} style={{ fontWeight: 700 }}>Subtotal Builder</td>
+                      <td colSpan={4} style={{ fontWeight: 700 }}>Subtotal Builder</td>
                       <td style={{ textAlign: 'right', fontWeight: 800 }}>
                         {formatCurrency(totalBuilderPayments)}
                       </td>
@@ -242,14 +298,13 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
             {monthOtherPayments.length === 0 ? (
               <div className="statement-empty">No other construction payments in this month.</div>
             ) : (
-
               <div className="table-wrapper-block">
                 <table className="statement-table">
                   <thead>
                     <tr>
                       <th>Date</th>
                       <th>Description</th>
-                      <th>Category</th>
+                      <th>Source</th>
                       <th>Method</th>
                       <th style={{ textAlign: 'right' }}>Amount</th>
                     </tr>
@@ -259,7 +314,11 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
                       <tr key={p._id}>
                         <td>{formatDate(p.date)}</td>
                         <td style={{ fontWeight: 600 }}>{p.description}</td>
-                        <td>{p.category}</td>
+                        <td>
+                          <span className={`tag ${getSourceLabel(p) === 'Home Loan' ? 'tag-loan' : 'tag-own'}`}>
+                            {getSourceLabel(p)}
+                          </span>
+                        </td>
                         <td>{p.paymentMethod}</td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>
                           {formatCurrency(p.amount)}
@@ -281,22 +340,17 @@ export default function PrintPage({ payments, cashSources, dashboardData }) {
           </div>
         </div>
 
-        {/* STATEMENT FOOTER */}
+        {/* SIGNATURE / FOOTER */}
         <div className="statement-footer">
-          End of Monthly Statement for {monthLabel} • Generated from Personal Construction Finance App
+          <div className="signature-box">
+            <div className="sig-line">Prepared By</div>
+            <div className="sig-title">Home Owner</div>
+          </div>
+          <div className="signature-box">
+            <div className="sig-line">Verified By</div>
+            <div className="sig-title">Auditor / Contractor</div>
+          </div>
         </div>
-      </div>
-
-      {/* PRINT BUTTON AT BOTTOM TOO (Hidden during print) */}
-      <div className="no-print" style={{ marginTop: '16px', textAlign: 'center' }}>
-        <button
-          onClick={handlePrint}
-          className="btn-submit"
-          style={{ width: '100%' }}
-        >
-          <Printer size={20} />
-          Print / Save Statement
-        </button>
       </div>
     </div>
   );

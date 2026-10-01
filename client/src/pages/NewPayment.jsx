@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check } from 'lucide-react';
-import { toInputDate } from '../utils/formatters';
+import { Camera, X, Check, Wallet, Landmark, AlertCircle } from 'lucide-react';
+import { toInputDate, formatCurrency } from '../utils/formatters';
 
-export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder = false }) {
+export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder = false, fundSources }) {
   const [date, setDate] = useState(toInputDate());
-  const [category, setCategory] = useState('Own Cash');
+  const [paymentSource, setPaymentSource] = useState('Own Cash');
   const [paymentMethod, setPaymentMethod] = useState('Online');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -14,6 +14,14 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
   const [previewUrl, setPreviewUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Dynamic available balance for chosen source
+  const ownCashRemaining = fundSources?.ownCash?.remainingBalance ?? 123000;
+  const homeLoanRemaining = fundSources?.homeLoan?.remainingBalance ?? 3000000;
+  const currentAvailable = paymentSource === 'Home Loan' ? homeLoanRemaining : ownCashRemaining;
+  const parsedAmount = parseFloat(amount) || 0;
+  const projectedRemaining = currentAvailable - parsedAmount;
+  const isOverBalance = parsedAmount > currentAvailable && currentAvailable > 0;
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -50,7 +58,8 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
     try {
       const formData = new FormData();
       formData.append('date', date);
-      formData.append('category', category);
+      formData.append('paymentSource', paymentSource);
+      formData.append('category', paymentSource); // Sync for full backward compatibility
       formData.append('paymentMethod', paymentMethod);
       formData.append('amount', amount);
       formData.append('description', description.trim());
@@ -126,20 +135,20 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
           />
         </div>
 
-        {/* CATEGORY & METHOD */}
-        <div className="filter-row" style={{ marginBottom: '18px' }}>
+        {/* PAYMENT SOURCE & METHOD */}
+        <div className="filter-row" style={{ marginBottom: '8px' }}>
           <div>
-            <label className="form-label" htmlFor="payment-category">
-              Category *
+            <label className="form-label" htmlFor="payment-source">
+              Payment Source *
             </label>
             <select
-              id="payment-category"
+              id="payment-source"
               className="form-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={paymentSource}
+              onChange={(e) => setPaymentSource(e.target.value)}
             >
               <option value="Own Cash">Own Cash</option>
-              <option value="Loan Cash">Loan Cash</option>
+              <option value="Home Loan">Home Loan</option>
             </select>
           </div>
 
@@ -163,6 +172,27 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
               <option value="Cheque">Cheque</option>
               <option value="Cash">Cash</option>
             </select>
+          </div>
+        </div>
+
+        {/* DYNAMIC BALANCE HELPER PILL */}
+        <div style={{ marginBottom: '18px' }}>
+          <div className={`source-balance-hint ${paymentSource === 'Home Loan' ? 'source-balance-hint-loan' : ''} ${isOverBalance ? 'source-balance-hint-warn' : ''}`}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              {paymentSource === 'Home Loan' ? <Landmark size={14} /> : <Wallet size={14} />}
+              <span>Available in {paymentSource}: <strong>{formatCurrency(currentAvailable)}</strong></span>
+            </span>
+            {parsedAmount > 0 && (
+              <span>
+                {isOverBalance ? (
+                  <span style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <AlertCircle size={13} /> Exceeds by {formatCurrency(parsedAmount - currentAvailable)}
+                  </span>
+                ) : (
+                  <span>Remaining: <strong>{formatCurrency(projectedRemaining)}</strong></span>
+                )}
+              </span>
+            )}
           </div>
         </div>
 
