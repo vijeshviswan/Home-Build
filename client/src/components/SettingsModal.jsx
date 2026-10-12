@@ -74,46 +74,102 @@ export default function SettingsModal({ settings, isOpen, onClose, onSave }) {
         {/* GOOGLE DRIVE STORAGE STATUS CARD */}
         {googleAuth && (
           <div style={{
-            background: googleAuth.authenticated ? '#ecfdf5' : '#eff6ff',
-            border: `1px solid ${googleAuth.authenticated ? '#a7f3d0' : '#bfdbfe'}`,
+            background: googleAuth.status === 'expired'
+              ? '#fff1f2'
+              : (googleAuth.authenticated ? '#ecfdf5' : '#eff6ff'),
+            border: `1px solid ${
+              googleAuth.status === 'expired'
+                ? '#fecdd3'
+                : (googleAuth.authenticated ? '#a7f3d0' : '#bfdbfe')
+            }`,
             borderRadius: '14px',
-            padding: '12px 16px',
-            marginBottom: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px'
+            padding: '14px 16px',
+            marginBottom: '18px'
           }}>
-            <div>
-              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: googleAuth.authenticated ? '#065f46' : '#1e40af' }}>
-                Google Drive: {googleAuth.authenticated ? 'Connected' : 'Not Connected'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <div style={{
+                  fontSize: '0.86rem',
+                  fontWeight: 700,
+                  color: googleAuth.status === 'expired'
+                    ? '#9f1239'
+                    : (googleAuth.authenticated ? '#065f46' : '#1e40af'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  {googleAuth.status === 'expired' && <span>⚠️</span>}
+                  Google Drive: {googleAuth.status === 'expired' ? 'Session Expired' : (googleAuth.authenticated ? 'Connected' : 'Not Connected')}
+                </div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: googleAuth.status === 'expired'
+                    ? '#be123c'
+                    : (googleAuth.authenticated ? '#047857' : '#3b82f6'),
+                  marginTop: '3px',
+                  lineHeight: 1.4
+                }}>
+                  {googleAuth.status === 'expired'
+                    ? 'Token has expired (invalid_grant). Tap Reconnect to grant fresh access.'
+                    : (googleAuth.authenticated
+                        ? `${googleAuth.account} (Personal Drive)`
+                        : 'Authorize to enable payment proof uploads')}
+                </div>
               </div>
-              <div style={{ fontSize: '0.75rem', color: googleAuth.authenticated ? '#047857' : '#3b82f6', marginTop: '2px' }}>
-                {googleAuth.authenticated ? `${googleAuth.account} (Personal Drive)` : 'Authorize to enable payment proof uploads'}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {googleAuth.authenticated ? (
+                  <>
+                    <span style={{ background: '#10b981', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px' }}>
+                      Active
+                    </span>
+                    <a
+                      href="/api/auth/google/url?redirect=true"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: '#059669',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Reconnect
+                    </a>
+                  </>
+                ) : (
+                  <a
+                    href="/api/auth/google/url?redirect=true"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      background: googleAuth.status === 'expired' ? '#e11d48' : '#2563eb',
+                      color: 'white',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                      boxShadow: googleAuth.status === 'expired' ? '0 2px 8px rgba(225, 29, 72, 0.25)' : 'none'
+                    }}
+                  >
+                    {googleAuth.status === 'expired' ? 'Reconnect Now' : 'Connect'}
+                  </a>
+                )}
               </div>
             </div>
-            {googleAuth.authenticated ? (
-              <span style={{ background: '#10b981', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px' }}>
-                Active
-              </span>
-            ) : (
-              <a
-                href="/api/auth/google/url?redirect=true"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  background: '#2563eb',
-                  color: 'white',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  padding: '7px 14px',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Connect
-              </a>
+
+            {googleAuth.status === 'expired' && (
+              <div style={{
+                marginTop: '10px',
+                paddingTop: '8px',
+                borderTop: '1px dashed #fecdd3',
+                fontSize: '0.72rem',
+                color: '#9f1239'
+              }}>
+                💡 <strong>Tip to prevent 7-day expiry:</strong> In Google Cloud Console, change OAuth consent screen publishing status from <em>Testing</em> to <em>In production</em>.
+              </div>
             )}
           </div>
         )}

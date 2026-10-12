@@ -94,11 +94,81 @@ function saveRefreshTokenToEnv(refreshToken) {
 
   fs.writeFileSync(ENV_PATH, envContent.trim() + '\n', 'utf8');
   process.env.GOOGLE_REFRESH_TOKEN = refreshToken;
+  clearAuthCache();
   console.log(`[Google OAuth] Saved GOOGLE_REFRESH_TOKEN to ${ENV_PATH} and loaded into process.env.`);
 }
 
+let cachedStatus = null;
+let lastCheckTime = 0;
+
+function clearAuthCache() {
+  cachedStatus = null;
+  lastCheckTime = 0;
+}
+
 /**
- * Checks if OAuth2 is currently configured with a valid refresh token
+ * Checks if OAuth2 is currently configured with a valid, non-expired refresh token.
+ * Caches the check for 60 seconds to avoid unnecessary Google API calls.
+ * @param {boolean} [forceRefresh=false]
+ */
+async function checkAuthStatus(forceRefresh = false) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret) {
+    return {
+      configured: false,
+      authenticated: false,
+      status: 'unconfigured',
+      message: 'GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in .env'
+    };
+  }
+
+  if (!refreshToken) {
+    return {
+      configured: true,
+      authenticated: false,
+      status: 'missing_token',
+      message: 'GOOGLE_REFRESH_TOKEN is not set'
+    };
+  }
+
+  const now = Date.now();
+  if (!forceRefresh && cachedStatus && (now - lastCheckTime < 60000)) {
+    return cachedStatus;
+  }
+
+  try {
+    const oauth2Client = getOAuth2Client();
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    await oauth2Client.getAccessToken();
+    cachedStatus = {
+      configured: true,
+      authenticated: true,
+      status: 'active',
+      account: 'vijeshviswanv@gmail.com'
+    };
+    lastCheckTime = now;
+    return cachedStatus;
+  } catch (err) {
+    const errCode = err.response?.data?.error || err.message;
+    const isInvalidGrant = errCode === 'invalid_grant' || String(err.message).includes('invalid_grant');
+    cachedStatus = {
+      configured: true,
+      authenticated: false,
+      status: isInvalidGrant ? 'expired' : 'error',
+      error: isInvalidGrant ? 'invalid_grant' : (err.message || 'OAuth error'),
+      message: isInvalidGrant ? 'Token expired or revoked (invalid_grant)' : err.message,
+      account: 'vijeshviswanv@gmail.com'
+    };
+    lastCheckTime = now;
+    return cachedStatus;
+  }
+}
+
+/**
+ * Checks if OAuth2 is currently configured with a refresh token string in env
  */
 function isOAuthReady() {
   return Boolean(
@@ -114,5 +184,8 @@ module.exports = {
   exchangeCodeForTokens,
   saveRefreshTokenToEnv,
   isOAuthReady,
+  checkAuthStatus,
+  clearAuthCache,
   ENV_PATH
 };
+

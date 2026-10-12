@@ -117,8 +117,10 @@ export default function App() {
     });
 
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Failed to save payment');
+      const errorData = await res.json().catch(() => ({}));
+      const err = new Error(errorData.error || 'Failed to save payment');
+      err.isAuthError = errorData.isAuthError;
+      throw err;
     }
 
     await loadData();
@@ -133,8 +135,10 @@ export default function App() {
     });
 
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Failed to update payment');
+      const errorData = await res.json().catch(() => ({}));
+      const err = new Error(errorData.error || 'Failed to update payment');
+      err.isAuthError = errorData.isAuthError;
+      throw err;
     }
 
     const updatedPayment = await res.json();

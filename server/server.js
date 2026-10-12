@@ -15,7 +15,7 @@ const FundSource = require('./models/FundSource');
 const FundAddition = require('./models/FundAddition');
 const LoanInstallment = require('./models/LoanInstallment');
 const { uploadImageToDrive, deleteFileFromDrive } = require('./services/googleDriveService');
-const { generateAuthUrl, exchangeCodeForTokens, isOAuthReady } = require('./services/googleOAuthService');
+const { generateAuthUrl, exchangeCodeForTokens, isOAuthReady, checkAuthStatus } = require('./services/googleOAuthService');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -212,14 +212,22 @@ async function seedInitialData() {
 // ==================== ROUTES ==================== //
 
 // 0. GOOGLE OAUTH 2.0 ROUTES
-app.get('/api/auth/google/status', (req, res) => {
-  const isReady = isOAuthReady();
-  res.json({
-    authenticated: isReady,
-    account: 'vijeshviswanv@gmail.com',
-    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
-    authMode: isReady ? 'OAuth2 (Personal Drive)' : 'Not Connected'
-  });
+app.get('/api/auth/google/status', async (req, res) => {
+  try {
+    const force = req.query.force === 'true';
+    const authCheck = await checkAuthStatus(force);
+    res.json({
+      authenticated: authCheck.authenticated,
+      status: authCheck.status, // 'active', 'expired', 'missing_token', 'unconfigured'
+      error: authCheck.error || null,
+      message: authCheck.message || '',
+      account: authCheck.account || 'vijeshviswanv@gmail.com',
+      folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
+      authMode: authCheck.authenticated ? 'OAuth2 (Personal Drive)' : 'Not Connected'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/auth/google/url', (req, res) => {
@@ -530,8 +538,14 @@ app.post('/api/payments', upload.single('proofImage'), async (req, res) => {
         console.log(`Successfully uploaded proof image to Google Drive. File ID: ${proofFileId}`);
       } catch (driveErr) {
         console.error('Google Drive upload failed:', driveErr.message);
+        const isAuthError = driveErr.message?.includes('invalid_grant') || 
+                            driveErr.response?.data?.error === 'invalid_grant' ||
+                            driveErr.code === 400;
         return res.status(502).json({
-          error: `Google Drive upload failed: ${driveErr.message}`
+          error: isAuthError 
+            ? 'Google Drive authorization expired (invalid_grant). Please reconnect Google Drive in Settings.' 
+            : `Google Drive upload failed: ${driveErr.message}`,
+          isAuthError: Boolean(isAuthError)
         });
       }
     }
@@ -629,7 +643,15 @@ app.put('/api/payments/:id', upload.single('proofImage'), async (req, res) => {
         payment.proofImage = payment.proofUrl;
       } catch (driveErr) {
         console.error('Google Drive update upload failed:', driveErr.message);
-        return res.status(502).json({ error: `Google Drive upload failed: ${driveErr.message}` });
+        const isAuthError = driveErr.message?.includes('invalid_grant') || 
+                            driveErr.response?.data?.error === 'invalid_grant' ||
+                            driveErr.code === 400;
+        return res.status(502).json({
+          error: isAuthError 
+            ? 'Google Drive authorization expired (invalid_grant). Please reconnect Google Drive in Settings.' 
+            : `Google Drive upload failed: ${driveErr.message}`,
+          isAuthError: Boolean(isAuthError)
+        });
       }
     }
 

@@ -85,7 +85,15 @@ export default function PaymentDetailsModal({ payment, onClose, onDelete, onUpda
       }
       setIsEditing(false);
     } catch (err) {
-      alert('Failed to update payment: ' + (err.message || 'Unknown error'));
+      const errMsg = err.message || '';
+      const isGrantError = errMsg.includes('invalid_grant') || 
+                           errMsg.includes('Google Drive authorization expired') ||
+                           err.isAuthError;
+      if (isGrantError) {
+        alert('Google Drive authorization expired (invalid_grant).\n\nPlease open Settings and tap "Reconnect Now" (or visit /api/auth/google/url?redirect=true) to re-authorize Google Drive before uploading receipts.');
+      } else {
+        alert('Failed to update payment: ' + (errMsg || 'Unknown error'));
+      }
     } finally {
       setIsSaving(false);
     }

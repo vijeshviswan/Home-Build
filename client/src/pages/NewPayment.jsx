@@ -15,6 +15,7 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
   const [proofFile, setProofFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState(false);
   const fileInputRef = useRef(null);
 
   // Dynamic available balance for chosen source
@@ -35,11 +36,13 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
     if (file) {
       setProofFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+      setAuthError(false);
     }
   };
 
   const handleRemoveFile = () => {
     setProofFile(null);
+    setAuthError(false);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl('');
@@ -61,6 +64,7 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
     }
 
     setIsSubmitting(true);
+    setAuthError(false);
 
     try {
       const formData = new FormData();
@@ -78,7 +82,15 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
 
       await onSubmitPayment(formData);
     } catch (err) {
-      alert('Failed to save payment: ' + (err.message || 'Unknown error'));
+      const errMsg = err.message || '';
+      const isGrantError = errMsg.includes('invalid_grant') || 
+                           errMsg.includes('Google Drive authorization expired') ||
+                           err.isAuthError;
+      if (isGrantError) {
+        setAuthError(true);
+      } else {
+        alert('Failed to save payment: ' + (errMsg || 'Unknown error'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -299,6 +311,84 @@ export default function NewPayment({ onSubmitPayment, onCancel, defaultIsBuilder
             </span>
           </label>
         </div>
+
+        {/* GOOGLE DRIVE AUTH ERROR BANNER */}
+        {authError && (
+          <div style={{
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            borderRadius: '14px',
+            padding: '16px',
+            marginBottom: '18px',
+            color: '#9f1239'
+          }}>
+            <div style={{ fontWeight: 800, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span>⚠️</span> Google Drive Authorization Expired
+            </div>
+            <p style={{ margin: '0 0 12px 0', fontSize: '0.82rem', lineHeight: 1.45, color: '#be123c' }}>
+              Upload failed (<code>invalid_grant</code>) because your Google OAuth session expired (7-day test limit).
+              Please reconnect Google Drive to upload your receipt, or save this payment now without the receipt.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              <a
+                href="/api/auth/google/url?redirect=true"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  background: '#e11d48',
+                  color: 'white',
+                  padding: '9px 16px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}
+                onClick={() => setAuthError(false)}
+              >
+                Reconnect Google Drive ↗
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm('Save this payment now without the receipt image? (You can upload the receipt later)')) {
+                    setAuthError(false);
+                    setProofFile(null);
+                    setIsSubmitting(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append('date', date);
+                      formData.append('paymentSource', paymentSource);
+                      formData.append('expenseCategory', expenseCategory);
+                      formData.append('category', paymentSource);
+                      formData.append('paymentMethod', paymentMethod);
+                      formData.append('amount', amount);
+                      formData.append('description', description.trim());
+                      formData.append('isBuilderPayment', isBuilderPayment);
+                      await onSubmitPayment(formData);
+                    } catch (retryErr) {
+                      alert('Failed to save payment: ' + (retryErr.message || 'Unknown error'));
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }
+                }}
+                style={{
+                  background: 'white',
+                  border: '1px solid #fca5a5',
+                  color: '#9f1239',
+                  padding: '9px 14px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Save Without Receipt
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* SUBMIT BUTTON */}
         <button
